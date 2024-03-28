@@ -38,6 +38,16 @@ class GCGDataset(Dataset):
         self.tokenizer = AutoTokenizer.from_pretrained(**tokenizer)
         self.prompt = self.tokenizer.encode(prompt, add_special_tokens=True)
 
+        num_added_toks = tokenizer.add_tokens(['<mask>', '</mask>'])
+        assert num_added_toks == 2
+
+    @property
+    def mask_start_id(self):
+        return self.tokenizer.added_tokens_encoder['<mask>']
+
+    @property
+    def mask_end_id(self):
+        return self.tokenizer.added_tokens_encoder['</mask>']
 
     def __len__(self):
         return len(self.data)
@@ -63,6 +73,8 @@ class GCGDataset(Dataset):
         input_ids = copy.deepcopy(self.prompt)
         mask_ids = [-1] * len(input_ids)
         mask_cnt = 0
+
+        caption = copy.deepcopy(data['caption'])
         for phrase, obj_info in data['groundings'].items():
             obj_start, obj_end = obj_info['token_positives']
             if obj_start <= 0 or obj_end <= 0:
@@ -70,46 +82,34 @@ class GCGDataset(Dataset):
             if obj_start < last_end:
                 continue
             assert caption[obj_start:obj_end].lower() == phrase.lower()
-            while obj_end < len(caption) and in_alphabet(caption[obj_end]):
-                obj_end += 1
-            assert obj_start >= last_end
-            if obj_start > last_end:
-                if caption[last_end] in [',', '.', '!', "?", ":", ';']:
-                    neg_input = self.tokenizer.encode("debug"+caption[last_end:obj_start].strip(),
-                                                      add_special_tokens=False)[1:]
-                else:
-                    neg_input = self.tokenizer.encode(caption[last_end:obj_start].strip(),
-                                                      add_special_tokens=False)
-                input_ids += neg_input
-                mask_ids += [-1] * len(neg_input)
 
+            caption = (f"{caption[:obj_start].strip()}"
+                       f" <mask> {caption[obj_start:obj_end]} </mask> "
+                       f"{caption[obj_end:].strip()}")
             # load mask
             mask = np.zeros((data['height'], data['width']), dtype=np.uint8)
             for rle_mask in obj_info['rle_masks']:
                 mask += mask_utils.decode(rle_mask)
             masks.append(mask.clip(max=1))
-
-            pos_input = self.tokenizer.encode(caption[obj_start:obj_end].strip(),
-                                              add_special_tokens=False)
-            input_ids += pos_input
-            mask_ids += [mask_cnt] * len(pos_input)
-
             last_end = obj_end
             mask_cnt += 1
         if mask_cnt == 0:
             return self.__getitem__(random.choice(range(self.__len__())))
-        ref = self.prompt + self.tokenizer.encode(caption[:last_end], add_special_tokens=False)
+
+        caption_ids = self.tokenizer.encode(caption, add_special_tokens=False)
+
+        # ref = self.prompt + self.tokenizer.encode(caption[:last_end], add_special_tokens=False)
 
         input_ids = torch.tensor(input_ids, dtype=torch.long)
         # ref_ids = torch.tensor(ref, dtype=torch.long)
-
+        #
         # assert (input_ids == ref_ids).all()
-
+        #
         # diff = input_ids != ref_ids
         # for id0, id1 in zip(input_ids[diff], ref_ids[diff]):
         #     # the same token can be encoded into different numbers
         #     assert self.tokenizer.decode(id0.item()) == self.tokenizer.decode(id1.item())
-
+        #
         # input_ids = ref_ids
 
         image = self.read_image(data['file_name'])
@@ -145,8 +145,14 @@ class GCGDataset(Dataset):
 if __name__ == '__main__':
     from frozen_llava.prompt_templates import llava_v1_6_mistral
     from tqdm import tqdm
-    dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
-                         local_path='data/GranDf_HA_images/train',
+    # dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
+    #                      local_path='data/GranDf_HA_images/train',
+    #                      prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+    #                      tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+    #                      image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+    
+    dataset = GCGDataset(json_file='data/OpenPsgGCG_train.json',
+                         local_path='data/coco',
                          prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
                          tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
                          image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
