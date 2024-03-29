@@ -11,8 +11,11 @@ class FrozenLlava(BaseModel):
         super().__init__()
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
+        mask_head.update(
+            in_channels=self.llava.config.text_config.num_attention_heads*
+                        self.llava.config.text_config.num_hidden_layers*2)
         self.mask_head = BUILDER.build(mask_head)
-        self.patch_size = self.llava.vision_config.patch_size
+        self.patch_size = self.llava.config.vision_config.patch_size
 
     def init_weights(self):
         pass
