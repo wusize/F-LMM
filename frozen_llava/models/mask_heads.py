@@ -1,3 +1,4 @@
+import math
 import torch
 import torch.nn as nn
 from mmcv.cnn import ConvModule
@@ -76,7 +77,15 @@ class UNetHead(UNet):
         self.init_weights()
 
     def forward(self, x):
-        x = super().forward(x)
+        h, w = x.shape[-2:]
+        dividend = 2**(self.num_stages - 1)
+        padded_h = math.ceil(h / dividend) * dividend
+        padded_w = math.ceil(w / dividend) * dividend
+
+        padded_x = x.new_zeros(*x.shape[:2], padded_h, padded_w)
+        padded_x[..., :h, :w] = x
+
+        x = super().forward(padded_x)[..., :h, :w]
         return self.conv_seg(x[-1])
 
 
