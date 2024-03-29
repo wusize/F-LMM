@@ -1,6 +1,10 @@
 import torch.nn as nn
 from mmcv.cnn import ConvModule
-from mmseg.models import UNet
+try:
+    from mmseg.models import UNet
+except:
+    UNet = None
+
 
 class FCNHead(nn.Module):
     """Fully Convolution Networks for Semantic Segmentation.
