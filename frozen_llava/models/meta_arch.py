@@ -77,22 +77,22 @@ class FrozenLlava(BaseModel):
                                      attention_mask=attention_mask, output_attentions=True)
             fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
             mask_ids = outputs['mask_ids']
-            attentions = []
-            for layer_id in range(len(outputs.attentions)):
-                attentions.append(
-                    outputs.attentions[layer_id][0, ..., outputs['image_to_overwrite'][0]])
-            attentions = torch.cat(attentions)
+            attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
+                          for attn in outputs.attentions]
             del outputs
 
             coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
             coarse_image_feature_h, coarse_image_feature_w = (
                 coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
 
-            attentions_with_coarse = attentions[..., :coarse_image_feature_h*coarse_image_feature_w].view(
-                *attentions.shape[:-1], coarse_image_feature_h, coarse_image_feature_w)
-            attentions_with_fine = attentions[..., coarse_image_feature_h * coarse_image_feature_w:].view(
-                *attentions.shape[:-1], fine_image_feature_h, fine_image_feature_w+1
-            )[..., :-1]
+            attentions_with_coarse = [
+                attn[..., :coarse_image_feature_h*coarse_image_feature_w].view(
+                    *attn.shape[:-1], coarse_image_feature_h, coarse_image_feature_w
+                ) for attn in attentions]
+            attentions_with_fine = [
+                attn[..., coarse_image_feature_h*coarse_image_feature_w:].view(
+                    *attn.shape[:-1], fine_image_feature_h, fine_image_feature_w+1
+                )[..., :-1] for attn in attentions]
             del attentions
             masks = data_sample['masks'].to(self.llava.device)
 
@@ -101,10 +101,13 @@ class FrozenLlava(BaseModel):
             for mask_id in range(len(masks)):
                 matched = mask_ids[0] == mask_id
                 assert matched.sum() > 0
-                attentions_with_coarse_list.append(
-                    self.apply_merge(attentions_with_coarse[:, matched], dim=1))
-                attentions_with_fine_list.append(
-                    self.apply_merge(attentions_with_fine[:, matched], dim=1))
+
+                mask_attentions_with_coarse = torch.cat(
+                    [self.apply_merge(attn[:, matched], dim=1) for attn in attentions_with_coarse])
+                mask_attentions_with_fine = torch.cat(
+                    [self.apply_merge(attn[:, matched], dim=1) for attn in attentions_with_fine])
+                attentions_with_coarse_list.append(mask_attentions_with_coarse)
+                attentions_with_fine_list.append(mask_attentions_with_fine)
             # print('==================debug================', flush=True)
             attentions_with_coarse = torch.stack(attentions_with_coarse_list)
             attentions_with_fine = torch.stack(attentions_with_fine_list)
