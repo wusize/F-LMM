@@ -103,7 +103,7 @@ class FrozenLlava(BaseModel):
                               size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
                 F.interpolate(attentions_with_fine,
                               size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
-            ])
+            ], dim=1)
             attention_maps.requires_grad = True
 
             pred_masks = self.mask_head(attention_maps)
