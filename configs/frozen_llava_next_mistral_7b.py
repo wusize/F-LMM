@@ -14,36 +14,11 @@ from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextFo
 from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from frozen_llava.models.meta_arch import FrozenLlava
 from frozen_llava.models.mask_heads import FCNHead, UNetHead
-from frozen_llava.prompt_templates import llava_v1_6_mistral
-
+from xtuner.utils.templates import PROMPT_TEMPLATE
 
 #######################################################################
 #                          PART 1  Settings                           #
 #######################################################################
-# Model
-
-llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
-# unet = dict(type=UNetHead,
-#             in_channels=2048,
-#             base_channels=64,
-#             num_stages=3,
-#             strides=(1, 1, 1),
-#             enc_num_convs=(1, 2, 2),   # the first enc is for projection
-#             dec_num_convs=(2, 2),
-#             downsamples=(True, True),
-#             enc_dilations=(1, 1, 1),
-#             dec_dilations=(1, 1),
-#             norm_cfg=dict(type=SyncBatchNorm),
-#             )
-fcn = dict(type=FCNHead,
-           num_convs=4,
-           kernel_size=3,
-           in_channels=2048,
-           channels=256,
-           concat_input=True,
-           norm_cfg=dict(type=SyncBatchNorm),
-           )
-
 
 # Scheduler & Optimizer
 batch_size = 16  # per_device
@@ -66,6 +41,29 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 #######################################################################
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
+# Model
+llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
+# unet = dict(type=UNetHead,
+#             in_channels=2048,
+#             base_channels=64,
+#             num_stages=3,
+#             strides=(1, 1, 1),
+#             enc_num_convs=(1, 2, 2),   # the first enc is for projection
+#             dec_num_convs=(2, 2),
+#             downsamples=(True, True),
+#             enc_dilations=(1, 1, 1),
+#             dec_dilations=(1, 1),
+#             norm_cfg=dict(type=SyncBatchNorm),
+#             )
+fcn = dict(type=FCNHead,
+           num_convs=4,
+           kernel_size=3,
+           in_channels=2048,
+           channels=256,
+           concat_input=True,
+           norm_cfg=dict(type=SyncBatchNorm),
+           )
+
 tokenizer=dict(
     type=AutoTokenizer.from_pretrained,
     pretrained_model_name_or_path=llava_name)
@@ -89,28 +87,28 @@ datasets_list = [
          ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
          json_file='data/GranDf_HA_GCG_train.json',
          local_path='data/GranDf_HA_images/train',
-         prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=GCGDataset,
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
          json_file='data/OpenPsgGCG_train.json',
          local_path='data/coco',
-         prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=RefCOCOGForGCGDataset,
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
          json_file='data/RefCOCOg_GCG_train.json',
          local_path='data/coco/train2014',
-         prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=FlickrForGCGDataset,
          ceph_path='BJ17:S3://wusize/flickr/train',
          json_file='data/flickr_mergedGT_GCG_train.json',
          local_path='data/flickr/train',
-         prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor)
 ]

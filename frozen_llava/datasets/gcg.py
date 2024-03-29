@@ -362,6 +362,12 @@ class FlickrForGCGDataset(GCGDataset):
                     image_sizes=torch.tensor(image_data['image_sizes'][0]))
 
 
+# TODO: use MUSE dataset
+class MuseForGCGDataset(GCGDataset):
+    def __init__(self, prompt_template, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.prompt_template = prompt_template
+
 
 if __name__ == '__main__':
     from frozen_llava.prompt_templates import llava_v1_6_mistral
