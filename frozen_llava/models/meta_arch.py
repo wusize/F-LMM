@@ -26,14 +26,13 @@ class FrozenLlava(BaseModel):
         self.training = mode
         return self
 
-
     def forward(self, data, data_samples=None, mode='loss'):
         if mode == 'loss':
-            return self.compute_loss(data, data_samples)
+            return self.compute_loss(data)
         elif mode == 'predict':
-            return self.predict(data, data_samples)
+            return self.predict(data)
         elif mode == 'tensor':
-            return self._forward(data, data_samples)
+            return self._forward(data)
         else:
             raise NotImplementedError
 
@@ -59,8 +58,13 @@ class FrozenLlava(BaseModel):
         loss_dict = {'loss': torch.tensor(0.0).to(self.llava.device)}
         return loss_dict
 
-    def __getattr__(self, name: str):
-        try:
-            return super().__getattr__(name)
-        except AttributeError:
-            return getattr(self.llava, name)
+
+    def train_step(self, data, optim_wrapper):
+        # Enable automatic mixed precision training context.
+        import pdb; pdb.set_trace()
+        with optim_wrapper.optim_context(self):
+            data = self.data_preprocessor(data, True)
+            losses = self._run_forward(data, mode='loss')  # type: ignore
+        parsed_losses, log_vars = self.parse_losses(losses)  # type: ignore
+        optim_wrapper.update_params(parsed_losses)
+        return log_vars
