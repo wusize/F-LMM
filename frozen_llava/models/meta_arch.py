@@ -75,16 +75,16 @@ class FrozenLlava(BaseModel):
             with torch.no_grad():
                 outputs = self.llava(**inputs,
                                      attention_mask=attention_mask, output_attentions=True)
-            attentions = outputs.pop('attentions')
-            for layer_id in range(len(attentions)):
-                attentions[layer_id] = attentions[layer_id][0, ..., outputs['image_to_overwrite'][0]]
-            attentions = torch.cat(attentions)
+            fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
+            mask_ids = outputs['mask_ids']
+            for layer_id in range(len(outputs.attentions)):
+                outputs.attentions[layer_id] = outputs.attentions[layer_id][0, ..., outputs['image_to_overwrite'][0]]
+            attentions = torch.cat(outputs.attentions)
+            del outputs
 
             coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
             coarse_image_feature_h, coarse_image_feature_w = (
                 coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
-
-            fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
 
             attentions_with_coarse = attentions[..., :coarse_image_feature_h*coarse_image_feature_w].view(
                 *attentions.shape[:-1], coarse_image_feature_h, coarse_image_feature_w)
@@ -93,7 +93,6 @@ class FrozenLlava(BaseModel):
             )[..., :-1]
             del attentions
             masks = data_sample['masks'].to(self.llava.device)
-            mask_ids = outputs['mask_ids']
 
             attentions_with_coarse_list = []
             attentions_with_fine_list = []
