@@ -136,7 +136,3 @@ class FrozenLlava(BaseModel):
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
                      'loss_dice': loss_dice / mask_cnts}
         return loss_dict
-
-    def _run_forward(self, data, mode):
-        results = self(data, mode=mode)
-        return results

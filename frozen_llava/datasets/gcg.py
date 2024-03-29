@@ -27,9 +27,11 @@ def concat_datasets(datasets_list):
     datasets_list = [BUILDER.build(dataset_) for dataset_ in datasets_list]
     return ConcatDataset(datasets_list)
 
+
 def gcg_collate_fn(instances: Sequence[Dict]):
-    return instances
+    # return instances
     # all list
+    return {'data': instances, 'data_samples': None}
     # keys = instances[0].keys()
     # return {k: [inst[k] for inst in instances] for k in keys}
 
