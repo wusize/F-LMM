@@ -17,7 +17,7 @@ from frozen_llava.models.meta_arch import FrozenLlava
 from frozen_llava.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
 from mmdet.models import DiceLoss, CrossEntropyLoss
-
+from mmseg.models.backbones.unet import InterpConv
 
 #######################################################################
 #                          PART 1  Settings                           #
@@ -58,6 +58,7 @@ unet = dict(type=UNetHead,
             enc_dilations=(1, 1, 1),
             dec_dilations=(1, 1),
             norm_cfg=dict(type=SyncBatchNorm),
+            upsample_cfg=dict(type=InterpConv)
             )
 # fcn = dict(type=FCNHead,
 #            num_convs=4,

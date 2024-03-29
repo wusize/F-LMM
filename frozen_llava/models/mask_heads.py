@@ -1,3 +1,4 @@
+import torch
 import torch.nn as nn
 from mmcv.cnn import ConvModule
 from mmseg.models import UNet
@@ -77,3 +78,19 @@ class UNetHead(UNet):
     def forward(self, x):
         x = super().forward(x)
         return self.conv_seg(x[-1])
+
+
+if __name__ == '__main__':
+    from mmseg.models.backbones.unet import InterpConv
+    unet = UNetHead(in_channels=2048,
+                    base_channels=64,
+                    num_stages=3,
+                    strides=(1, 1, 1),
+                    enc_num_convs=(2, 2, 2),  # the first enc is for projection
+                    dec_num_convs=(2, 2),
+                    downsamples=(True, True),
+                    enc_dilations=(1, 1, 1),
+                    dec_dilations=(1, 1),
+                    upsample_cfg=dict(type=InterpConv))
+
+    torch.save(unet.state_dict(), 'data/unet_example.pth')
