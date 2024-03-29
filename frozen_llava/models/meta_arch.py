@@ -75,9 +75,10 @@ class FrozenLlava(BaseModel):
             with torch.no_grad():
                 outputs = self.llava(**inputs,
                                      attention_mask=attention_mask, output_attentions=True)
-
-            attentions = torch.cat([attention[0, ..., outputs['image_to_overwrite'][0]]
-                                    for attention in outputs['attentions']])
+            attentions = outputs.pop('attentions')
+            for layer_id in range(len(attentions)):
+                attentions[layer_id] = attentions[layer_id][0, ..., outputs['image_to_overwrite'][0]]
+            attentions = torch.cat(attentions)
 
             coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
             coarse_image_feature_h, coarse_image_feature_w = (
@@ -90,6 +91,7 @@ class FrozenLlava(BaseModel):
             attentions_with_fine = attentions[..., coarse_image_feature_h * coarse_image_feature_w:].view(
                 *attentions.shape[:-1], fine_image_feature_h, fine_image_feature_w+1
             )[..., :-1]
+            del attentions
             masks = data_sample['masks'].to(self.llava.device)
             mask_ids = outputs['mask_ids']
 
@@ -112,6 +114,7 @@ class FrozenLlava(BaseModel):
                 F.interpolate(attentions_with_fine.float(),
                               size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
             ], dim=1).to(self.llava.dtype)
+            del attentions_with_coarse, attentions_with_fine
             attention_maps.requires_grad = True
             # print(f"============={attention_maps.dtype}===========", flush=True)
             pred_masks = self.mask_head(attention_maps)[:, 0]
