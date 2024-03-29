@@ -43,6 +43,7 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 # Model
+prompt_template = PROMPT_TEMPLATE.mistral
 llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
 # unet = dict(type=UNetHead,
 #             in_channels=2048,
@@ -89,28 +90,28 @@ datasets_list = [
          ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
          json_file='data/GranDf_HA_GCG_train.json',
          local_path='data/GranDf_HA_images/train',
-         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+         prompt=prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=GCGDataset,
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
          json_file='data/OpenPsgGCG_train.json',
          local_path='data/coco',
-         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+         prompt=prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=RefCOCOGForGCGDataset,
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
          json_file='data/RefCOCOg_GCG_train.json',
          local_path='data/coco/train2014',
-         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+         prompt=prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=FlickrForGCGDataset,
          ceph_path='BJ17:S3://wusize/flickr/train',
          json_file='data/flickr_mergedGT_GCG_train.json',
          local_path='data/flickr/train',
-         prompt=PROMPT_TEMPLATE.mistral['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+         prompt=prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor)
 ]
