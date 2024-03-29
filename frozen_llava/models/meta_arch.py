@@ -108,9 +108,9 @@ class FrozenLlava(BaseModel):
 
             attention_maps = torch.cat([
                 F.interpolate(attentions_with_coarse,
-                              size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
+                              size=(fine_image_feature_h, fine_image_feature_w)),
                 F.interpolate(attentions_with_fine,
-                              size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
+                              size=(fine_image_feature_h, fine_image_feature_w))
             ], dim=1)
             attention_maps.requires_grad = True
 
