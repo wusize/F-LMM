@@ -1,8 +1,11 @@
 import math
+import types
 import torch
 import torch.nn as nn
 from mmcv.cnn import ConvModule
 from mmseg.models import UNet
+from mmseg.models.utils.wrappers import Upsample, resize
+from mmengine.logging import print_log
 
 
 class FCNHead(nn.Module):
@@ -70,10 +73,26 @@ class FCNHead(nn.Module):
         return x
 
 
+def upsample_forward_func(self, x):
+    dtype = x.dtype
+    x = x.float()
+    if not self.size:
+        size = [int(t * self.scale_factor) for t in x.shape[-2:]]
+    else:
+        size = self.size
+    return resize(x, size, None, self.mode, self.align_corners).to(dtype)
+
+
 class UNetHead(UNet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conv_seg = nn.Conv2d(self.base_channels, 1, kernel_size=1)
+
+        for module in self.modules():
+            if isinstance(module, Upsample):
+                print_log("Replace upsample forward function")
+                module.forward = types.MethodType(upsample_forward_func, module)
+
         self.init_weights()
 
     def forward(self, x):
