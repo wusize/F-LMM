@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from mmengine.model import BaseModel
 from xtuner.registry import BUILDER
 
@@ -71,7 +72,30 @@ class FrozenLlava(BaseModel):
                 *attentions.shape[:-1], fine_image_feature_h, fine_image_feature_w+1
             )[..., :-1]
             masks = data_sample['masks'].to(self.llava.device)
+            mask_ids = outputs['mask_ids']
+
+            attentions_with_coarse_list = []
+            attentions_with_fine_list = []
             import pdb; pdb.set_trace()
+            for mask_id in range(len(masks)):
+                matched = mask_ids == mask_id
+                assert matched.sum() > 0
+                attentions_with_coarse_list.append(attentions_with_coarse[:, matched].mean(dim=1))
+                attentions_with_fine_list.append(attentions_with_fine[:, matched].mean(dim=1))
+            attentions_with_coarse = torch.stack(attentions_with_coarse_list)
+            attentions_with_fine = torch.stack(attentions_with_fine_list)
+
+            attention_maps = torch.cat([
+                F.interpolate(attentions_with_coarse,
+                              size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
+                F.interpolate(attentions_with_fine,
+                              size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
+            ])
+            attention_maps.requires_grad = True
+
+            pred_masks = self.mask_head(attention_maps)
+            gt_masks = F.interpolate(masks.to(attention_maps)[None],
+                                     size=(fine_image_feature_h, fine_image_feature_w))[0]
 
         loss_dict = {'loss': torch.tensor(0.0).to(self.llava.device)}
         return loss_dict
