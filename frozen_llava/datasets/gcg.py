@@ -20,6 +20,7 @@ from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from xtuner.registry import BUILDER
 from typing import Dict, Sequence
 from tqdm import tqdm
+from torch.utils.data import ConcatDataset
 
 
 def concat_datasets(datasets_list):
@@ -374,7 +375,6 @@ class MuseForGCGDataset(GCGDataset):
 
 
 if __name__ == '__main__':
-    from torch.utils.data import ConcatDataset
     dataset_list = []
     from xtuner.utils.templates import PROMPT_TEMPLATE
     prompt_template = PROMPT_TEMPLATE.mistral
