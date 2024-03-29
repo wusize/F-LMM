@@ -51,7 +51,7 @@ class FrozenLlava(BaseModel):
                                                                             dtype=self.llava.dtype),
                           image_sizes=data_sample['image_sizes'][None].to(self.llava.device))
             attention_mask = torch.ones(inputs['input_ids'].shape, device=self.llava.device,
-                                        dtype=self.llava.dtype)
+                                        dtype=torch.bool)
             with torch.no_grad():
                 outputs = self.llava(**inputs,
                                      attention_mask=attention_mask, output_attentions=True)
