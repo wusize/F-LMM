@@ -111,12 +111,12 @@ class FrozenLlava(BaseModel):
                               size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
                 F.interpolate(attentions_with_fine.float(),
                               size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
-            ], dim=1).to(attentions_with_coarse)
+            ], dim=1).to(self.llava.dtype)
             attention_maps.requires_grad = True
 
             pred_masks = self.mask_head(attention_maps)[:, 0]
             gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
-                                     size=(fine_image_feature_h, fine_image_feature_w))[0].to(attention_maps)
+                                     size=(fine_image_feature_h, fine_image_feature_w))[0].to(self.llava.dtype)
             assert pred_masks.shape == gt_masks.shape
             mask_cnt = pred_masks.shape[0]
             mask_cnts += mask_cnt
