@@ -85,8 +85,8 @@ class UNetHead(UNet):
         padded_x = x.new_zeros(*x.shape[:2], padded_h, padded_w)
         padded_x[..., :h, :w] = x
 
-        x = super().forward(padded_x)[..., :h, :w]
-        return self.conv_seg(x[-1])
+        x = super().forward(padded_x)[-1][..., :h, :w]
+        return self.conv_seg(x)
 
 
 if __name__ == '__main__':
