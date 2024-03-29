@@ -63,6 +63,7 @@ class FrozenLlava(BaseModel):
         mask_cnts = 0
         loss_dice = 0
         loss_mask = 0
+        accuracy = 0
         for data_sample in data:
             assert data_sample['pixel_values'].shape[0] > 1
             inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
@@ -138,8 +139,12 @@ class FrozenLlava(BaseModel):
                 pred_masks.view(-1),
                 gt_masks.view(-1),
                 avg_factor=mask_cnt*fine_image_feature_h*fine_image_feature_w) * mask_cnt
+            acc = torch.eq((pred_masks.detach().sigmoid() > 0.5).to(gt_masks),
+                           gt_masks).to(gt_masks).mean()
+            accuracy += acc * mask_cnt
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
-                     'loss_dice': loss_dice / mask_cnts}
+                     'loss_dice': loss_dice / mask_cnts,
+                     'accuracy': accuracy / mask_cnts}
         return loss_dict
