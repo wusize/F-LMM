@@ -44,6 +44,7 @@ class FrozenLlava(BaseModel):
 
     def compute_loss(self, data):
         for data_sample in data:
+            assert data_sample['pixel_values'].shape[0] > 1
             inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
                           mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
                           pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
@@ -54,6 +55,9 @@ class FrozenLlava(BaseModel):
             with torch.no_grad():
                 outputs = self.llava(**inputs,
                                      attention_mask=attention_mask, output_attentions=True)
+
+            attentions = torch.cat([attention[0, ..., outputs['image_to_overwrite'][0]]
+                                    for attention in outputs['attentions']])
 
             masks = data_sample['masks'].to(self.llava.device)
             import pdb; pdb.set_trace()
