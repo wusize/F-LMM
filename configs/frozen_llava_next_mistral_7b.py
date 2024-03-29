@@ -14,7 +14,7 @@ from frozen_llava.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOG
 from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
 from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from frozen_llava.models.meta_arch import FrozenLlava
-from frozen_llava.models.mask_heads import FCNHead, UNetHead
+from frozen_llava.models.mask_heads import FCNHead # , UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
 
 #######################################################################
