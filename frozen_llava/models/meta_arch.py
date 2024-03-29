@@ -58,13 +58,6 @@ class FrozenLlava(BaseModel):
         loss_dict = {'loss': torch.tensor(0.0).to(self.llava.device)}
         return loss_dict
 
-
-    def train_step(self, data, optim_wrapper):
-        # Enable automatic mixed precision training context.
-        import pdb; pdb.set_trace()
-        with optim_wrapper.optim_context(self):
-            data = self.data_preprocessor(data, True)
-            losses = self._run_forward(data, mode='loss')  # type: ignore
-        parsed_losses, log_vars = self.parse_losses(losses)  # type: ignore
-        optim_wrapper.update_params(parsed_losses)
-        return log_vars
+    def _run_forward(self, data, mode):
+        results = self(data, mode=mode)
+        return results
