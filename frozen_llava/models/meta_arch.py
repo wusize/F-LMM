@@ -45,15 +45,15 @@ class FrozenLlava(BaseModel):
     def compute_loss(self, data):
         import pdb; pdb.set_trace()
         for data_sample in data:
-            inputs = dict(input_ids=data_sample['input_ids'].to(self.llava.device),
-                          mask_ids=data_sample['mask_ids'].to(self.llava.device),
-                          pixel_values=data_sample['pixel_values'].to(device=self.llava.device,
-                                                                      dtype=self.llava.dtype),
-                          image_sizes=data_sample['image_sizes'].to(self.llava.device))
+            inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
+                          mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
+                          pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
+                                                                            dtype=self.llava.dtype),
+                          image_sizes=data_sample['image_sizes'][None].to(self.llava.device))
             with torch.no_grad():
-                outputs = self.llava(data_sample)
+                outputs = self.llava(**inputs, output_attentions=True)
 
-            masks = inputs['masks'].to(self.llava.device)
+            masks = outputs['masks'].to(self.llava.device)
 
         loss_dict = {'loss': torch.tensor(0.0).to(self.llava.device)}
         return loss_dict
