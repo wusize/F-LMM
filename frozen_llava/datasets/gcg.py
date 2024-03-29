@@ -35,7 +35,7 @@ def gcg_collate_fn(instances: Sequence[Dict]):
 class GCGDataset(Dataset):
     def __init__(self, json_file,
                  image_processor=None, tokenizer=None,
-                 ceph_path=None, local_path=None, prompt=''):
+                 ceph_path=None, local_path=None, prompt_template=None):
         super().__init__()
         self._load_annotations(json_file)
         self.ceph_path = ceph_path
@@ -45,7 +45,10 @@ class GCGDataset(Dataset):
 
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_processor = BUILDER.build(image_processor)
-        self.prompt = self.tokenizer.encode(prompt, add_special_tokens=True)
+        self.prompt = self.tokenizer.encode(
+            prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+            add_special_tokens=True)
+        self.prompt_template = prompt_template
 
         special_tokens_dict = {'additional_special_tokens': ['<mask>', '</mask>']}
         num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
@@ -374,9 +377,11 @@ if __name__ == '__main__':
     from torch.utils.data import ConcatDataset
     from tqdm import tqdm
     dataset_list = []
+    from xtuner.utils.templates import PROMPT_TEMPLATE
+    prompt_template = PROMPT_TEMPLATE.mistral
     ha_dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
                             local_path='data/GranDf_HA_images/train',
-                            prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+                            prompt_template=prompt_template,
                             tokenizer=dict(
                                 type=AutoTokenizer.from_pretrained,
                                 pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
@@ -386,7 +391,7 @@ if __name__ == '__main__':
     
     psg_dataset = GCGDataset(json_file='data/OpenPsgGCG_train.json',
                              local_path='data/coco',
-                             prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+                             prompt_template=prompt_template,
                              tokenizer=dict(
                                  type=AutoTokenizer.from_pretrained,
                                  pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
@@ -397,7 +402,7 @@ if __name__ == '__main__':
     refcocog_dataset = RefCOCOGForGCGDataset(
         json_file='data/RefCOCOg_GCG_train.json',
         local_path='data/coco/train2014',
-        prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+        prompt_template=prompt_template,
         tokenizer=dict(
             type=AutoTokenizer.from_pretrained,
             pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
@@ -408,7 +413,7 @@ if __name__ == '__main__':
     flickr_dataset = FlickrForGCGDataset(
         json_file='data/flickr_mergedGT_GCG_train.json',
         local_path='data/flickr/train',
-        prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+        prompt_template=prompt_template,
         tokenizer=dict(
             type=AutoTokenizer.from_pretrained,
             pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
