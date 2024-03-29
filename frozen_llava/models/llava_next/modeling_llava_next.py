@@ -62,6 +62,7 @@ class LlavaNextCausalLMOutputWithPast(ModelOutput):
     image_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     image_to_overwrite: Optional[Tuple[torch.BoolTensor]] = None
     mask_ids: Optional[Tuple[torch.LongTensor]] = None
+    image_feature_shapes: Optional[List[tuple]] = None
 
 
 @add_start_docstrings(
@@ -222,6 +223,7 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
             if vision_feature_select_strategy is not None
             else self.config.vision_feature_select_strategy
         )
+        image_feature_shapes = []
 
         if inputs_embeds is None:
             # 1. Extract the input embeddings
@@ -268,6 +270,7 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                         image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
                         image_feature = image_feature.flatten(1, 2).flatten(2, 3)
                         image_feature = unpad_image(image_feature, image_sizes[image_idx])
+                        image_feature_shapes.append(image_feature.shape[1:])
                         image_feature = torch.cat(
                             (
                                 image_feature,
@@ -278,6 +281,7 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                         image_feature = image_feature.flatten(1, 2).transpose(0, 1)
                         image_feature = torch.cat((base_image_feature, image_feature), dim=0)
                     else:
+                        image_feature_shapes.append(None)
                         image_feature = image_feature[0]
                         image_feature = torch.cat((image_feature, self.image_newline[None]), dim=0)
                     new_image_features.append(image_feature)
@@ -364,5 +368,6 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
             image_to_overwrite=image_to_overwrite,
-            mask_ids=mask_ids
+            mask_ids=mask_ids,
+            image_feature_shapes=image_feature_shapes
         )
