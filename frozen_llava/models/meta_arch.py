@@ -8,7 +8,8 @@ class FrozenLlava(BaseModel):
 
     def __init__(self,
                  model,
-                 mask_head):
+                 mask_head,
+                 merge='mean'):
         super().__init__()
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
@@ -17,6 +18,16 @@ class FrozenLlava(BaseModel):
                         self.llava.config.text_config.num_hidden_layers*2)
         self.mask_head = BUILDER.build(mask_head)
         self.patch_size = self.llava.config.vision_config.patch_size
+        self.merge = merge
+        assert merge in ['mean', 'max']
+
+    def apply_merge(self, x, dim=1):
+        if self.merge == 'mean':
+            return x.mean(dim=dim)
+        elif self.merge == 'max':
+            return x.max(dim=dim).values
+        else:
+            raise NotImplementedError
 
     def init_weights(self):
         pass
@@ -80,8 +91,10 @@ class FrozenLlava(BaseModel):
             for mask_id in range(len(masks)):
                 matched = mask_ids == mask_id
                 assert matched.sum() > 0
-                attentions_with_coarse_list.append(attentions_with_coarse[:, matched].mean(dim=1))
-                attentions_with_fine_list.append(attentions_with_fine[:, matched].mean(dim=1))
+                attentions_with_coarse_list.append(
+                    self.apply_merge(attentions_with_coarse[:, matched], dim=1))
+                attentions_with_fine_list.append(
+                    self.apply_merge(attentions_with_fine[:, matched], dim=1))
             attentions_with_coarse = torch.stack(attentions_with_coarse_list)
             attentions_with_fine = torch.stack(attentions_with_fine_list)
 
