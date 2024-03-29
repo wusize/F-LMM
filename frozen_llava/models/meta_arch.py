@@ -9,7 +9,9 @@ class FrozenLlava(BaseModel):
     def __init__(self,
                  model,
                  mask_head,
-                 merge='mean'):
+                 merge='mean',
+                 loss_mask=None,
+                 loss_dice=None):
         super().__init__()
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
@@ -20,6 +22,9 @@ class FrozenLlava(BaseModel):
         self.patch_size = self.llava.config.vision_config.patch_size
         self.merge = merge
         assert merge in ['mean', 'max']
+
+        self.loss_mask = BUILDER.build(loss_mask)
+        self.loss_dice = BUILDER.build(loss_dice)
 
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
@@ -55,6 +60,9 @@ class FrozenLlava(BaseModel):
         return None
 
     def compute_loss(self, data):
+        mask_cnts = 0
+        loss_dice = 0
+        loss_mask = 0
         for data_sample in data:
             assert data_sample['pixel_values'].shape[0] > 1
             inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
@@ -106,11 +114,27 @@ class FrozenLlava(BaseModel):
             ], dim=1)
             attention_maps.requires_grad = True
 
-            pred_masks = self.mask_head(attention_maps)
+            pred_masks = self.mask_head(attention_maps)[:, 0]
             gt_masks = F.interpolate(masks.to(attention_maps)[None],
                                      size=(fine_image_feature_h, fine_image_feature_w))[0]
+            assert pred_masks.shape == gt_masks.shape
+            mask_cnt = pred_masks.shape[0]
+            mask_cnts += mask_cnt
 
-        loss_dict = {'loss': torch.tensor(0.0).to(self.llava.device)}
+            # dice loss
+            loss_dice += self.loss_dice(
+                pred_masks.view(mask_cnt, -1), gt_masks.view(mask_cnt, -1),
+                avg_factor=mask_cnt) * mask_cnt
+
+            # mask loss
+            loss_mask += self.loss_mask(
+                pred_masks.view(-1),
+                gt_masks.view(-1),
+                avg_factor=mask_cnt*fine_image_feature_h*fine_image_feature_w) * mask_cnt
+
+        assert mask_cnts > 0
+        loss_dict = {'loss_mask': loss_mask / mask_cnts,
+                     'loss_dice': loss_dice / mask_cnts}
         return loss_dict
 
     def _run_forward(self, data, mode):

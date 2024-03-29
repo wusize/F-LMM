@@ -16,6 +16,8 @@ from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from frozen_llava.models.meta_arch import FrozenLlava
 from frozen_llava.models.mask_heads import FCNHead # , UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
+from mmdet.models import DiceLoss, CrossEntropyLoss
+
 
 #######################################################################
 #                          PART 1  Settings                           #
@@ -66,10 +68,10 @@ fcn = dict(type=FCNHead,
            norm_cfg=dict(type=SyncBatchNorm),
            )
 
-tokenizer=dict(
+tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
     pretrained_model_name_or_path=llava_name)
-image_processor=dict(
+image_processor = dict(
     type=CustomLlavaNextImageProcessor.from_pretrained,
     pretrained_model_name_or_path=llava_name)
 
@@ -78,7 +80,20 @@ model = dict(
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),
-    mask_head=fcn
+    mask_head=fcn,
+    loss_mask=dict(
+        type=CrossEntropyLoss,
+        use_sigmoid=True,
+        reduction='mean',
+        loss_weight=1.0),
+    loss_dice=dict(
+        type=DiceLoss,
+        use_sigmoid=True,
+        activate=True,
+        reduction='mean',
+        naive_dice=True,
+        eps=1.0,
+        loss_weight=1.0)
 )
 
 #######################################################################
