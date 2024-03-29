@@ -77,9 +77,11 @@ class FrozenLlava(BaseModel):
                                      attention_mask=attention_mask, output_attentions=True)
             fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
             mask_ids = outputs['mask_ids']
+            attentions = []
             for layer_id in range(len(outputs.attentions)):
-                outputs.attentions[layer_id] = outputs.attentions[layer_id][0, ..., outputs['image_to_overwrite'][0]]
-            attentions = torch.cat(outputs.attentions)
+                attentions.append(
+                    outputs.attentions[layer_id][0, ..., outputs['image_to_overwrite'][0]])
+            attentions = torch.cat(attentions)
             del outputs
 
             coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
