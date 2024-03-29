@@ -102,7 +102,7 @@ class FrozenLlava(BaseModel):
                     self.apply_merge(attentions_with_coarse[:, matched], dim=1))
                 attentions_with_fine_list.append(
                     self.apply_merge(attentions_with_fine[:, matched], dim=1))
-            # import pdb; pdb.set_trace()
+            print('==================debug================', flush=True)
             attentions_with_coarse = torch.stack(attentions_with_coarse_list)
             attentions_with_fine = torch.stack(attentions_with_fine_list)
 
