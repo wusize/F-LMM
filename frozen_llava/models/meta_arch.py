@@ -59,6 +59,17 @@ class FrozenLlava(BaseModel):
             attentions = torch.cat([attention[0, ..., outputs['image_to_overwrite'][0]]
                                     for attention in outputs['attentions']])
 
+            coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
+            coarse_image_feature_h, coarse_image_feature_w = (
+                coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
+
+            fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
+
+            attentions_with_coarse = attentions[..., :coarse_image_feature_h*coarse_image_feature_w].view(
+                *attentions.shape[:-1], coarse_image_feature_h, coarse_image_feature_w)
+            attentions_with_fine = attentions[..., coarse_image_feature_h * coarse_image_feature_w:].view(
+                *attentions.shape[:-1], fine_image_feature_h, fine_image_feature_w+1
+            )[..., :-1]
             masks = data_sample['masks'].to(self.llava.device)
             import pdb; pdb.set_trace()
 
