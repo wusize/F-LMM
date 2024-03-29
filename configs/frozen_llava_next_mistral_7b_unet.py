@@ -80,7 +80,9 @@ model = dict(
     type=FrozenLlava,
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
-               torch_dtype=torch.float16, low_cpu_mem_usage=True),
+               torch_dtype=torch.float16,
+               # low_cpu_mem_usage=True
+               ),
     mask_head=unet,
     loss_mask=dict(
         type=CrossEntropyLoss,
