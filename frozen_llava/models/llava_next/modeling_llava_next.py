@@ -61,7 +61,7 @@ class LlavaNextCausalLMOutputWithPast(ModelOutput):
     attentions: Optional[Tuple[torch.FloatTensor]] = None
     image_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     image_to_overwrite: Optional[Tuple[torch.BoolTensor]] = None
-
+    mask_ids: Optional[Tuple[torch.LongTensor]] = None
 
 
 @add_start_docstrings(
@@ -70,9 +70,9 @@ class LlavaNextCausalLMOutputWithPast(ModelOutput):
 )
 class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration):
 
-
     # Copied from transformers.models.llava.modeling_llava.LlavaForConditionalGeneration._merge_input_ids_with_image_features
-    def _merge_input_ids_with_image_features(self, image_features, inputs_embeds, input_ids, attention_mask, labels):
+    def _merge_input_ids_with_image_features(
+            self, image_features, inputs_embeds, input_ids, attention_mask, labels, mask_ids=None):
         num_images, num_image_patches, embed_dim = image_features.shape
         batch_size, sequence_length = input_ids.shape
         left_padding = not torch.sum(input_ids[:, -1] == torch.tensor(self.pad_token_id))
@@ -105,6 +105,12 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
             final_labels = torch.full(
                 (batch_size, max_embed_dim), self.config.ignore_index, dtype=input_ids.dtype, device=input_ids.device
             )
+
+        if mask_ids is not None:
+            final_mask_ids = torch.full(
+                (batch_size, max_embed_dim), -1, dtype=input_ids.dtype, device=input_ids.device
+            )
+
         # In case the Vision model or the Language model has been offloaded to CPU, we need to manually
         # set the corresponding tensors into their correct target device.
         target_device = inputs_embeds.device
@@ -121,6 +127,8 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
         final_attention_mask[batch_indices, text_to_overwrite] = attention_mask[batch_indices, non_image_indices]
         if labels is not None:
             final_labels[batch_indices, text_to_overwrite] = labels[batch_indices, non_image_indices]
+        if mask_ids is not None:
+            final_mask_ids[batch_indices, text_to_overwrite] = mask_ids[batch_indices, non_image_indices]
 
         # 5. Fill the embeddings corresponding to the images. Anything that is still zeros needs filling
         image_to_overwrite = torch.all(final_embedding == 0, dim=-1)
@@ -144,8 +152,10 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
 
         if labels is None:
             final_labels = None
+        if mask_ids is None:
+            final_mask_ids = None
 
-        return final_embedding, final_attention_mask, final_labels, position_ids, image_to_overwrite
+        return final_embedding, final_attention_mask, final_labels, position_ids, final_mask_ids, image_to_overwrite
 
     @add_start_docstrings_to_model_forward(LLAVA_NEXT_INPUTS_DOCSTRING)
     @replace_return_docstrings(output_type=LlavaNextCausalLMOutputWithPast, config_class=_CONFIG_FOR_DOC)
@@ -165,6 +175,7 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
         return_dict: Optional[bool] = None,
+        mask_ids: Optional[torch.LongTensor] = None,
         image_to_overwrite: Optional[torch.BoolTensor] = None,
     ) -> Union[Tuple, LlavaNextCausalLMOutputWithPast]:
         r"""
@@ -272,9 +283,10 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                     new_image_features.append(image_feature)
                 image_features = torch.stack(new_image_features, dim=0)
 
-                inputs_embeds, attention_mask, labels, position_ids, image_to_overwrite \
+                inputs_embeds, attention_mask, labels, position_ids, mask_ids, image_to_overwrite \
                     = self._merge_input_ids_with_image_features(image_features,
-                                                                inputs_embeds, input_ids, attention_mask, labels)
+                                                                inputs_embeds, input_ids, attention_mask, labels,
+                                                                mask_ids=mask_ids)
                 if labels is None:
                     labels = torch.full_like(attention_mask, self.config.ignore_index).to(torch.long)
 
@@ -351,5 +363,6 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
             past_key_values=outputs.past_key_values,
             hidden_states=outputs.hidden_states,
             attentions=outputs.attentions,
-            image_to_overwrite=image_to_overwrite
+            image_to_overwrite=image_to_overwrite,
+            mask_ids=mask_ids
         )

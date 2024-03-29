@@ -14,13 +14,9 @@ except:
     Client = None
 
 import pycocotools.mask as mask_utils
-from transformers import AutoTokenizer, AutoImageProcessor, LlavaNextProcessor
+from pycocotools.coco import COCO
+from transformers import AutoTokenizer
 from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
-
-
-def in_alphabet(x):
-    return x in 'abcdefghijklmnopqrstuvwxyz'
-
 
 
 class GCGDataset(Dataset):
@@ -28,8 +24,7 @@ class GCGDataset(Dataset):
                  image_processor=None, tokenizer=None,
                  ceph_path=None, local_path=None, prompt=''):
         super().__init__()
-        with open(json_file, 'r') as f:
-            self.data = json.load(f)
+        self._load_annotations(json_file)
         self.ceph_path = ceph_path
         self.local_path = local_path
         self.FILE_CLIENT = None
@@ -38,8 +33,13 @@ class GCGDataset(Dataset):
         self.tokenizer = AutoTokenizer.from_pretrained(**tokenizer)
         self.prompt = self.tokenizer.encode(prompt, add_special_tokens=True)
 
-        num_added_toks = tokenizer.add_tokens(['<mask>', '</mask>'])
+        special_tokens_dict = {'additional_special_tokens': ['<mask>', '</mask>']}
+        num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
         assert num_added_toks == 2
+
+    def _load_annotations(self, json_file):
+        with open(json_file, 'r') as f:
+            self.data = json.load(f)
 
     @property
     def mask_start_id(self):
@@ -66,16 +66,14 @@ class GCGDataset(Dataset):
         return image
 
     def __getitem__(self, index):
-        data = self.data[index]
+        sample_data = self.data[index]
         masks = []
         last_end = 0
-        caption = data['caption']
-        input_ids = copy.deepcopy(self.prompt)
-        mask_ids = [-1] * len(input_ids)
         mask_cnt = 0
 
-        caption = copy.deepcopy(data['caption'])
-        for phrase, obj_info in data['groundings'].items():
+        caption = copy.deepcopy(sample_data['caption'])
+        new_caption = ''
+        for phrase, obj_info in sample_data['groundings'].items():
             obj_start, obj_end = obj_info['token_positives']
             if obj_start <= 0 or obj_end <= 0:
                 continue
@@ -83,11 +81,9 @@ class GCGDataset(Dataset):
                 continue
             assert caption[obj_start:obj_end].lower() == phrase.lower()
 
-            caption = (f"{caption[:obj_start].strip()}"
-                       f" <mask> {caption[obj_start:obj_end]} </mask> "
-                       f"{caption[obj_end:].strip()}")
+            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
             # load mask
-            mask = np.zeros((data['height'], data['width']), dtype=np.uint8)
+            mask = np.zeros((sample_data['height'], sample_data['width']), dtype=np.uint8)
             for rle_mask in obj_info['rle_masks']:
                 mask += mask_utils.decode(rle_mask)
             masks.append(mask.clip(max=1))
@@ -96,23 +92,33 @@ class GCGDataset(Dataset):
         if mask_cnt == 0:
             return self.__getitem__(random.choice(range(self.__len__())))
 
-        caption_ids = self.tokenizer.encode(caption, add_special_tokens=False)
-
-        # ref = self.prompt + self.tokenizer.encode(caption[:last_end], add_special_tokens=False)
-
+        input_ids = self.prompt + self.tokenizer.encode(new_caption, add_special_tokens=False)
         input_ids = torch.tensor(input_ids, dtype=torch.long)
-        # ref_ids = torch.tensor(ref, dtype=torch.long)
-        #
-        # assert (input_ids == ref_ids).all()
-        #
-        # diff = input_ids != ref_ids
-        # for id0, id1 in zip(input_ids[diff], ref_ids[diff]):
-        #     # the same token can be encoded into different numbers
-        #     assert self.tokenizer.decode(id0.item()) == self.tokenizer.decode(id1.item())
-        #
-        # input_ids = ref_ids
 
-        image = self.read_image(data['file_name'])
+        # Fixme: when special tokens are followed by punctuations, the behaviour is different
+        input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[0]]
+
+        final_input_ids = []
+        mask_ids = []
+        mask_start_ids = torch.where(input_ids == self.mask_start_id)[0]
+        mask_end_ids = torch.where(input_ids == self.mask_end_id)[0]
+        assert len(mask_end_ids) == len(mask_start_ids)
+        assert len(mask_end_ids) == mask_cnt
+
+        last_id = 0
+        for mask_id, (mask_start_id, mask_end_id) in enumerate(zip(mask_start_ids, mask_end_ids)):
+            if last_id < mask_start_id:
+                final_input_ids.append(input_ids[last_id:mask_start_id])
+                mask_ids += [-1] * (mask_start_id - last_id)
+
+            final_input_ids.append(input_ids[mask_start_id+1:mask_end_id])
+            mask_ids += [mask_id] * (mask_end_id-1-mask_start_id)
+            last_id = mask_end_id + 1
+
+        final_input_ids = torch.cat(final_input_ids)
+        mask_ids = torch.tensor(mask_ids)
+
+        image = self.read_image(sample_data['file_name'])
         image_data = self.image_processor.preprocess(image)
 
         pixel_values = torch.from_numpy(image_data['pixel_values'][0])
@@ -124,21 +130,215 @@ class GCGDataset(Dataset):
         h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
         masks = F.interpolate(masks[None], size=(h, w))[0]
 
-        p_h, p_w =  meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        p_h, p_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
 
-        padded_masks = torch.zeros(mask_cnt, p_h, p_w)
+        padded_masks = torch.zeros(mask_cnt, p_h, p_w, dtype=masks.dtype)
         padding = meta_data['padding']
 
         padded_masks[:, padding['before_height']:p_h-padding['after_height'],
-                    padding['before_width']:p_w-padding['after_width']] = masks
+                        padding['before_width']:p_w-padding['after_width']] = masks
 
-        return dict(input_ids=input_ids,
+        return dict(input_ids=final_input_ids,
+                    mask_ids=mask_ids,
                     pixel_values=pixel_values,
                     resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]))
 
+
+class RefCOCOGForGCGDataset(GCGDataset):
+    def __getitem__(self, index):
+        data_sample = list(self.data[index].values())[0]
+        segmentations = []
+        last_end = 0
+        mask_cnt = 0
+        caption = copy.deepcopy(data_sample['caption'])
+        new_caption = ''
+        for ref in data_sample['refs']:
+            if ref['sentence'] in caption.lower():
+                obj_start = caption.lower().find(ref['sentence'])
+                if obj_start == -1:
+                    continue
+                obj_end = obj_start + len(ref['sentence'])
+                segmentations.append(ref['segmentation'])
+
+                new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+                last_end = obj_end
+                mask_cnt += 1
+
+        if mask_cnt == 0:
+            return self.__getitem__(random.choice(range(self.__len__())))
+
+        input_ids = self.prompt + self.tokenizer.encode(new_caption, add_special_tokens=False)
+        input_ids = torch.tensor(input_ids, dtype=torch.long)
+
+        # Fixme: when special tokens are followed by punctuations, the behaviour is different
+        input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[0]]
+
+        final_input_ids = []
+        mask_ids = []
+        mask_start_ids = torch.where(input_ids == self.mask_start_id)[0]
+        mask_end_ids = torch.where(input_ids == self.mask_end_id)[0]
+        assert len(mask_end_ids) == len(mask_start_ids)
+        assert len(mask_end_ids) == mask_cnt
+
+        last_id = 0
+        for mask_id, (mask_start_id, mask_end_id) in enumerate(zip(mask_start_ids, mask_end_ids)):
+            if last_id < mask_start_id:
+                final_input_ids.append(input_ids[last_id:mask_start_id])
+                mask_ids += [-1] * (mask_start_id - last_id)
+
+            final_input_ids.append(input_ids[mask_start_id+1:mask_end_id])
+            mask_ids += [mask_id] * (mask_end_id-1-mask_start_id)
+            last_id = mask_end_id + 1
+
+        final_input_ids = torch.cat(final_input_ids)
+        mask_ids = torch.tensor(mask_ids)
+
+        image = self.read_image(data_sample['img_file_name'])
+        height, width = image.height, image.width
+
+        masks = []
+
+        for segmentation in segmentations:
+            binary_mask = np.zeros((height, width), dtype=np.uint8)
+            for seg in segmentation:
+                rles = mask_utils.frPyObjects([seg], height, width)
+                m = mask_utils.decode(rles)
+                m = m.astype(np.uint8)
+                binary_mask += m.squeeze()
+            masks.append(binary_mask.clip(max=1))
+
+        image_data = self.image_processor.preprocess(image)
+        pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        meta_data = image_data['meta_datas'][0]
+
+        masks = torch.from_numpy(np.stack(masks))
+        resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
+
+        h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
+        masks = F.interpolate(masks[None], size=(h, w))[0]
+
+        p_h, p_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+
+        padded_masks = torch.zeros(mask_cnt, p_h, p_w, dtype=masks.dtype)
+        padding = meta_data['padding']
+
+        padded_masks[:, padding['before_height']:p_h-padding['after_height'],
+                        padding['before_width']:p_w-padding['after_width']] = masks
+
+        return dict(input_ids=final_input_ids,
+                    mask_ids=mask_ids,
+                    pixel_values=pixel_values,
+                    resized_masks=resized_masks,   # shape is not kept
+                    padded_masks=padded_masks,
+                    masks=masks,   # shape is kept
+                    image_sizes=torch.tensor(image_data['image_sizes'][0]))
+
+
+class FlickrForGCGDataset(GCGDataset):
+    def _load_annotations(self, ann_file):
+        # Load annotations and filter out images with very short captions
+        coco = COCO(ann_file)
+        self.data = []
+        for image_id, anns in tqdm(coco.imgToAnns.items()):
+            image_info = coco.imgs[image_id]
+            caption = image_info['caption']
+            if len(caption.split(' ')) < 3:
+                continue
+            height = int(image_info['height'])
+            width = int(image_info['width'])
+            if height <= 32 or width <= 32:
+                continue
+
+            file_name = image_info['file_name'].split('_')[-1]
+
+            self.data.append(dict(caption=caption,
+                                  file_name=file_name,
+                                  width=width,
+                                  height=height,
+                                  annotations=anns)
+                             )
+
+    def __getitem__(self, index):
+        sample_data = self.data[index]
+        masks = []
+        last_end = 0
+        mask_cnt = 0
+
+        caption = copy.deepcopy(sample_data['caption'])
+        new_caption = ''
+        for annotation in sample_data['annotations']:
+            assert len(annotation['tokens_positive']) == 1
+            obj_start, obj_end = annotation['tokens_positive'][0]
+            if obj_start <= 0 or obj_end <= 0:
+                continue
+            if obj_start < last_end:
+                continue
+
+            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+            # load mask
+            masks.append(mask_utils.decode(annotation['sam_mask']))
+            last_end = obj_end
+            mask_cnt += 1
+
+        if mask_cnt == 0:
+            return self.__getitem__(random.choice(range(self.__len__())))
+
+        input_ids = self.prompt + self.tokenizer.encode(new_caption, add_special_tokens=False)
+        input_ids = torch.tensor(input_ids, dtype=torch.long)
+
+        # Fixme: when special tokens are followed by punctuations, the behaviour is different
+        input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[0]]
+
+        final_input_ids = []
+        mask_ids = []
+        mask_start_ids = torch.where(input_ids == self.mask_start_id)[0]
+        mask_end_ids = torch.where(input_ids == self.mask_end_id)[0]
+        assert len(mask_end_ids) == len(mask_start_ids)
+        assert len(mask_end_ids) == mask_cnt
+
+        last_id = 0
+        for mask_id, (mask_start_id, mask_end_id) in enumerate(zip(mask_start_ids, mask_end_ids)):
+            if last_id < mask_start_id:
+                final_input_ids.append(input_ids[last_id:mask_start_id])
+                mask_ids += [-1] * (mask_start_id - last_id)
+
+            final_input_ids.append(input_ids[mask_start_id+1:mask_end_id])
+            mask_ids += [mask_id] * (mask_end_id-1-mask_start_id)
+            last_id = mask_end_id + 1
+
+        final_input_ids = torch.cat(final_input_ids)
+        mask_ids = torch.tensor(mask_ids)
+
+        image = self.read_image(sample_data['file_name'])
+        image_data = self.image_processor.preprocess(image)
+
+        pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        meta_data = image_data['meta_datas'][0]
+
+        masks = torch.from_numpy(np.stack(masks))
+        resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
+
+        h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
+        masks = F.interpolate(masks[None], size=(h, w))[0]
+
+        p_h, p_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+
+        padded_masks = torch.zeros(mask_cnt, p_h, p_w, dtype=masks.dtype)
+        padding = meta_data['padding']
+
+        padded_masks[:, padding['before_height']:p_h-padding['after_height'],
+                        padding['before_width']:p_w-padding['after_width']] = masks
+
+        return dict(input_ids=final_input_ids,
+                    mask_ids=mask_ids,
+                    pixel_values=pixel_values,
+                    resized_masks=resized_masks,   # shape is not kept
+                    padded_masks=padded_masks,
+                    masks=masks,   # shape is kept
+                    image_sizes=torch.tensor(image_data['image_sizes'][0]))
 
 
 
@@ -151,33 +351,26 @@ if __name__ == '__main__':
     #                      tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
     #                      image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
     
-    dataset = GCGDataset(json_file='data/OpenPsgGCG_train.json',
-                         local_path='data/coco',
-                         prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
-                         tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
-                         image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+    # dataset = GCGDataset(json_file='data/OpenPsgGCG_train.json',
+    #                      local_path='data/coco',
+    #                      prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+    #                      tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+    #                      image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+
+    # dataset = RefCOCOGForGCGDataset(
+    #     json_file='data/RefCOCOg_GCG_train.json',
+    #     local_path='data/flickr/train',
+    #     prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+    #     tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+    #     image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+
+    dataset = FlickrForGCGDataset(
+        json_file='data/flickr_mergedGT_GCG_train.json',
+        local_path='data/flickr/train',
+        prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+        tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+        image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
 
 
     for i in tqdm(range(len(dataset))):
         data = dataset.__getitem__(i)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
