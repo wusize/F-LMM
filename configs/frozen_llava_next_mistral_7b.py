@@ -1,4 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
+import torch
 from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
@@ -74,7 +75,8 @@ image_processor=dict(
 model = dict(
     type=FrozenLlava,
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
-               pretrained_model_name_or_path=llava_name),
+               pretrained_model_name_or_path=llava_name,
+               torch_dtype=torch.float16, low_cpu_mem_usage=True),
     mask_head=fcn
 )
 
