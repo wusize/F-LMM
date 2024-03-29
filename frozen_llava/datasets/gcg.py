@@ -17,6 +17,19 @@ import pycocotools.mask as mask_utils
 from pycocotools.coco import COCO
 from transformers import AutoTokenizer
 from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
+from xtuner.registry import BUILDER
+from typing import Dict, Sequence
+
+
+def concat_datasets(datasets_list):
+    datasets_list = [BUILDER.build(dataset_) for dataset_ in datasets_list]
+    return ConcatDataset(datasets_list)
+
+def gcg_collate_fn(instances: Sequence[Dict]):
+    return instances
+    # all list
+    # keys = instances[0].keys()
+    # return {k: [inst[k] for inst in instances] for k in keys}
 
 
 class GCGDataset(Dataset):
@@ -29,8 +42,9 @@ class GCGDataset(Dataset):
         self.local_path = local_path
         self.FILE_CLIENT = None
         self.use_ceph = (Client is not None) and (ceph_path is not None)
-        self.image_processor = CustomLlavaNextImageProcessor.from_pretrained(**image_processor)
-        self.tokenizer = AutoTokenizer.from_pretrained(**tokenizer)
+
+        self.tokenizer = BUILDER.build(tokenizer)
+        self.image_processor = BUILDER.build(image_processor)
         self.prompt = self.tokenizer.encode(prompt, add_special_tokens=True)
 
         special_tokens_dict = {'additional_special_tokens': ['<mask>', '</mask>']}
@@ -75,7 +89,7 @@ class GCGDataset(Dataset):
         new_caption = ''
         for phrase, obj_info in sample_data['groundings'].items():
             obj_start, obj_end = obj_info['token_positives']
-            if obj_start <= 0 or obj_end <= 0:
+            if obj_start < 0 or obj_end <= 0:
                 continue
             if obj_start < last_end:
                 continue
@@ -264,27 +278,33 @@ class FlickrForGCGDataset(GCGDataset):
     def __getitem__(self, index):
         sample_data = self.data[index]
         masks = []
-        last_end = 0
         mask_cnt = 0
-
-        caption = copy.deepcopy(sample_data['caption'])
         new_caption = ''
+        tokens_positive_list = []
+        tokens_positive_cnt = 0
+        tokens_positive2mask = {}
         for annotation in sample_data['annotations']:
-            assert len(annotation['tokens_positive']) == 1
-            obj_start, obj_end = annotation['tokens_positive'][0]
-            if obj_start <= 0 or obj_end <= 0:
-                continue
-            if obj_start < last_end:
-                continue
-
-            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+            for tokens_positive in annotation['tokens_positive']:
+                tokens_positive_list.append(tokens_positive)
+                tokens_positive2mask[tokens_positive_cnt] = mask_cnt
+                tokens_positive_cnt += 1
             # load mask
             masks.append(mask_utils.decode(annotation['sam_mask']))
-            last_end = obj_end
             mask_cnt += 1
-
+        assert tokens_positive_cnt >= mask_cnt
         if mask_cnt == 0:
             return self.__getitem__(random.choice(range(self.__len__())))
+
+        tokens_positive_order = sorted(range(tokens_positive_cnt),
+                                       key=lambda x: tokens_positive_list[x][0])
+        last_end = 0
+        caption = copy.deepcopy(sample_data['caption'])
+
+        for tokens_positive_idx in tokens_positive_order:
+            obj_start, obj_end = tokens_positive_list[tokens_positive_idx]
+            assert obj_start >= last_end
+            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+            last_end = obj_end
 
         input_ids = self.prompt + self.tokenizer.encode(new_caption, add_special_tokens=False)
         input_ids = torch.tensor(input_ids, dtype=torch.long)
@@ -294,20 +314,21 @@ class FlickrForGCGDataset(GCGDataset):
 
         final_input_ids = []
         mask_ids = []
-        mask_start_ids = torch.where(input_ids == self.mask_start_id)[0]
+        obj_start_ids = torch.where(input_ids == self.mask_start_id)[0]
         mask_end_ids = torch.where(input_ids == self.mask_end_id)[0]
-        assert len(mask_end_ids) == len(mask_start_ids)
-        assert len(mask_end_ids) == mask_cnt
+        assert len(mask_end_ids) == len(obj_start_ids)
+        assert len(mask_end_ids) == tokens_positive_cnt
 
         last_id = 0
-        for mask_id, (mask_start_id, mask_end_id) in enumerate(zip(mask_start_ids, mask_end_ids)):
-            if last_id < mask_start_id:
-                final_input_ids.append(input_ids[last_id:mask_start_id])
-                mask_ids += [-1] * (mask_start_id - last_id)
-
-            final_input_ids.append(input_ids[mask_start_id+1:mask_end_id])
-            mask_ids += [mask_id] * (mask_end_id-1-mask_start_id)
-            last_id = mask_end_id + 1
+        for tokens_positive_order_idx, (obj_start_id, obj_end_id) in enumerate(zip(obj_start_ids, mask_end_ids)):
+            if last_id < obj_start_id:
+                final_input_ids.append(input_ids[last_id:obj_start_id])
+                mask_ids += [-1] * (obj_start_id - last_id)
+            tokens_positive_idx = tokens_positive_order[tokens_positive_order_idx]
+            mask_id = tokens_positive2mask[tokens_positive_idx]
+            final_input_ids.append(input_ids[obj_start_id+1:obj_end_id])
+            mask_ids += [mask_id] * (obj_end_id-1-obj_start_id)
+            last_id = obj_end_id + 1
 
         final_input_ids = torch.cat(final_input_ids)
         mask_ids = torch.tensor(mask_ids)
@@ -344,33 +365,52 @@ class FlickrForGCGDataset(GCGDataset):
 
 if __name__ == '__main__':
     from frozen_llava.prompt_templates import llava_v1_6_mistral
+    from torch.utils.data import ConcatDataset
     from tqdm import tqdm
-    # dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
-    #                      local_path='data/GranDf_HA_images/train',
-    #                      prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
-    #                      tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
-    #                      image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+    dataset_list = []
+    ha_dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
+                            local_path='data/GranDf_HA_images/train',
+                            prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+                            tokenizer=dict(
+                                type=AutoTokenizer.from_pretrained,
+                                pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                            image_processor=dict(
+                                type=CustomLlavaNextImageProcessor.from_pretrained,
+                                pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
     
-    # dataset = GCGDataset(json_file='data/OpenPsgGCG_train.json',
-    #                      local_path='data/coco',
-    #                      prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
-    #                      tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
-    #                      image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+    psg_dataset = GCGDataset(json_file='data/OpenPsgGCG_train.json',
+                             local_path='data/coco',
+                             prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+                             tokenizer=dict(
+                                 type=AutoTokenizer.from_pretrained,
+                                 pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                             image_processor=dict(
+                                 type=CustomLlavaNextImageProcessor.from_pretrained,
+                                 pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
 
-    # dataset = RefCOCOGForGCGDataset(
-    #     json_file='data/RefCOCOg_GCG_train.json',
-    #     local_path='data/flickr/train',
-    #     prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
-    #     tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
-    #     image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+    refcocog_dataset = RefCOCOGForGCGDataset(
+        json_file='data/RefCOCOg_GCG_train.json',
+        local_path='data/coco/train2014',
+        prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
+        tokenizer=dict(
+            type=AutoTokenizer.from_pretrained,
+            pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+        image_processor=dict(
+            type=CustomLlavaNextImageProcessor.from_pretrained,
+            pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
 
-    dataset = FlickrForGCGDataset(
+    flickr_dataset = FlickrForGCGDataset(
         json_file='data/flickr_mergedGT_GCG_train.json',
         local_path='data/flickr/train',
         prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
-        tokenizer=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
-        image_processor=dict(pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
+        tokenizer=dict(
+            type=AutoTokenizer.from_pretrained,
+            pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+        image_processor=dict(
+            type=CustomLlavaNextImageProcessor.from_pretrained,
+            pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'))
 
+    dataset = ConcatDataset([ha_dataset, psg_dataset, refcocog_dataset, flickr_dataset])
 
     for i in tqdm(range(len(dataset))):
         data = dataset.__getitem__(i)
