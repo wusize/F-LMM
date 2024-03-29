@@ -14,6 +14,8 @@ class FrozenLlava(BaseModel):
         self.mask_head = BUILDER.build(mask_head)
         self.patch_size = self.llava.vision_config.patch_size
 
+    def init_weights(self):
+        pass
 
     def train(self, mode=True):
         self.llava.train(mode=False)

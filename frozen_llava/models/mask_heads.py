@@ -60,7 +60,6 @@ class FCNHead(nn.Module):
         self.convs = nn.Sequential(*convs)
         self.conv_seg = nn.Conv2d(self.channels, 1, kernel_size=1)
 
-
     def forward(self, x):
         """Forward function."""
         x = self.convs(x)
@@ -68,12 +67,11 @@ class FCNHead(nn.Module):
         return x
 
 
-
 class UNetHead(UNet):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
         self.conv_seg = nn.Conv2d(self.base_channels, 1, kernel_size=1)
+        self.init_weights()
 
     def forward(self, x):
         x = super().forward(x)

@@ -1,29 +1,13 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-import torch
 from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
 from torch.nn import SyncBatchNorm
-from transformers import (AutoModelForCausalLM, AutoTokenizer,
-                          CLIPImageProcessor, CLIPVisionModel)
-
-from xtuner.dataset import LLaVADataset
-from xtuner.dataset.collate_fns import default_collate_fn
-from xtuner.dataset.map_fns import llava_map_fn, template_map_fn_factory
-from xtuner.dataset.samplers import LengthGroupedSampler
-from xtuner.engine.hooks import DatasetInfoHook, EvaluateChatHook
+from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
 from mmengine.dataset import DefaultSampler
-
-
-
-from xtuner.model import LLaVAModel
-from xtuner.utils import PROMPT_TEMPLATE
-
-
-
 from frozen_llava.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
                                        concat_datasets, gcg_collate_fn)
 from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
@@ -42,13 +26,13 @@ llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
 # unet = dict(type=UNetHead,
 #             in_channels=2048,
 #             base_channels=64,
-#             num_stages=2,
-#             strides=(1, 1, ),
-#             enc_num_convs=(2, 2, ),
-#             dec_num_convs=(2, ),
-#             downsamples=(True, ),
-#             enc_dilations=(1, 1, ),
-#             dec_dilations=(1, ),
+#             num_stages=3,
+#             strides=(1, 1, 1),
+#             enc_num_convs=(1, 2, 2),   # the first enc is for projection
+#             dec_num_convs=(2, 2),
+#             downsamples=(True, True),
+#             enc_dilations=(1, 1, 1),
+#             dec_dilations=(1, 1),
 #             norm_cfg=dict(type=SyncBatchNorm),
 #             )
 fcn = dict(type=FCNHead,
@@ -102,24 +86,28 @@ model = dict(
 
 datasets_list = [
     dict(type=GCGDataset,
+         ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
          json_file='data/GranDf_HA_GCG_train.json',
          local_path='data/GranDf_HA_images/train',
          prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=GCGDataset,
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
          json_file='data/OpenPsgGCG_train.json',
          local_path='data/coco',
          prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=RefCOCOGForGCGDataset,
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
          json_file='data/RefCOCOg_GCG_train.json',
          local_path='data/coco/train2014',
          prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
          tokenizer=tokenizer,
          image_processor=image_processor),
     dict(type=FlickrForGCGDataset,
+         ceph_path='BJ17:S3://wusize/flickr/train',
          json_file='data/flickr_mergedGT_GCG_train.json',
          local_path='data/flickr/train',
          prompt=llava_v1_6_mistral.format(input='<image>\nWhat is shown in this image?'),
