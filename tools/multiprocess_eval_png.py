@@ -76,7 +76,7 @@ if __name__ == '__main__':
     # sync GPUs and start the timer
     accelerator.wait_for_everyone()
 
-    data_ids = list(range(len(png_dataset)))
+    data_ids = list(range(len(png_dataset)))[:101]
 
     # divide the prompt list onto the available GPUs
     with accelerator.split_between_processes(data_ids) as sub_ids:
