@@ -39,7 +39,7 @@ if __name__ == '__main__':
                device_map='auto')
     
     llm = BUILDER.build(llm)
-    mask_head = BUILDER.build(mask_head).to(llm.device)
+    mask_head = BUILDER.build(mask_head).to(dtype=llm.dtype, device=llm.device)
     if args.checkpoint is not None:
         state_dict = guess_load_checkpoint(args.checkpoint)
         if args.checkpoint_prefix is None:
