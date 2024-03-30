@@ -63,6 +63,7 @@ if __name__ == '__main__':
     mask_ious = []
     isthing = []
     plural = []
+    pixel_accs = []
     for idx in tqdm(range(100)):
         data_sample = png_dataset[idx]
         assert data_sample['pixel_values'].shape[0] > 1
@@ -134,10 +135,13 @@ if __name__ == '__main__':
         mask_infos = data_sample['mask_infos']
         isthing.append(torch.tensor([mask_info['isthing'] for mask_info in mask_infos]))
         plural.append(torch.tensor([mask_info['plural'] for mask_info in mask_infos]))
+        pixel_accs.append(torch.eq((pred_masks.detach().sigmoid() > 0.5).to(gt_masks),
+                                   gt_masks).to(gt_masks).flatten(1, 2).mean(-1))
 
     mask_ious = torch.cat(mask_ious)
     isthing = torch.cat(isthing)
     plural = torch.cat(plural)
+    pixel_accs = torch.cat(pixel_accs)
 
     AA = mask_ious.mean()
     AA_singulars = mask_ious[torch.logical_not(plural)].mean()
@@ -149,4 +153,5 @@ if __name__ == '__main__':
 
 
     print(f"aIoU: {AA}, aIoU_singulars: {AA_singulars}, aIoU_plurals: {AA_plurals}, "
-          f"aIoU_things: {AA_things}, aIoU_stuff: {AA_stuff}, aAcc@0.5: {accuracy}", flush=True)
+          f"aIoU_things: {AA_things}, aIoU_stuff: {AA_stuff}, aAcc@0.5: {accuracy}, "
+          f"pixel_accs: {pixel_accs.mean()}", flush=True)
