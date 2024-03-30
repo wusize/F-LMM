@@ -152,7 +152,7 @@ class FrozenLlava(BaseModel):
                 pred_masks.view(-1),
                 gt_masks.view(-1),
                 weight=weight,
-                avg_factor=1) * mask_cnt
+                avg_factor=2) * mask_cnt
             acc = torch.eq((pred_masks.detach().sigmoid() > 0.5).to(gt_masks),
                            gt_masks).to(gt_masks).mean()
             accuracy += acc * mask_cnt
