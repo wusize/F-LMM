@@ -82,6 +82,9 @@ class PNGDataset(Dataset):
         caption_input_ids = []
         mask_ids = [-1]*len(self.prompt)
         mask_segment_ids = []
+        mask_infos = []   # record isthing, plural
+        image_id = int(data_sample['image_id'])
+        annotations = {ann['id']: ann for ann in self.coco.imgToAnns[image_id]}
         for segment in data_sample['segments']:
             segment_input_ids = self.tokenizer.encode(segment['utterance'], add_special_tokens=False)
             caption_input_ids += segment_input_ids
@@ -90,13 +93,21 @@ class PNGDataset(Dataset):
             else:
                 mask_ids += [mask_cnt] * len(segment_input_ids)
                 mask_segment_ids.append(segment['segment_ids'])
+                if not segment['plural']:
+                    assert len(segment['segment_ids']) == 1
+                    segment_id = int(segment['segment_ids'][0])
+                    isthing = self.coco.cats[annotations[segment_id]['category_id']]['isthing']
+
+                else:
+                    isthing = 1
+                mask_infos.append(dict(plural=segment['plural'],
+                                       isthing=isthing > 0))
                 # todo: load masks
                 mask_cnt += 1
 
         if mask_cnt == 0:
             return self.__getitem__(random.choice(range(self.__len__())))
 
-        image_id = int(data_sample['image_id'])
         image_info = self.coco.imgs[image_id]
         segm_file = image_info['segm_file']
         segm_map = self._load_segm(os.path.join(self.panoptic_png_path, segm_file))
@@ -140,7 +151,8 @@ class PNGDataset(Dataset):
                     resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
-                    image_sizes=torch.tensor(image_data['image_sizes'][0]))
+                    image_sizes=torch.tensor(image_data['image_sizes'][0]),
+                    mask_infos=mask_infos)
 
 
 if __name__ == '__main__':
@@ -150,9 +162,9 @@ if __name__ == '__main__':
     from transformers import AutoTokenizer
     from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
     from tqdm import tqdm
-    dataset = PNGDataset(json_file='data/png_coco_train2017.json',
-                         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-                         panoptic_png_path='data/coco/panoptic_train2017',
+    dataset = PNGDataset(json_file='data/png_coco_val2017.json',
+                         panoptic_json_file='data/coco/annotations/panoptic_val2017.json',
+                         panoptic_png_path='data/coco/panoptic_val2017',
                          tokenizer=dict(
                              type=AutoTokenizer.from_pretrained,
                              pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
@@ -160,7 +172,7 @@ if __name__ == '__main__':
                              type=CustomLlavaNextImageProcessor.from_pretrained,
                              pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
                          prompt_template=prompt_template,
-                         local_path='data/coco/train2017'
+                         local_path='data/coco/val2017'
                          )
 
     for i in tqdm(range(len(dataset))):
