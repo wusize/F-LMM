@@ -75,6 +75,7 @@ if __name__ == '__main__':
     mask_ious = []
     isthing = []
     plural = []
+    pixel_accs = []
 
     # sync GPUs and start the timer
     accelerator.wait_for_everyone()
@@ -149,6 +150,9 @@ if __name__ == '__main__':
                                         size=masks.shape[-2:]) > 0.5)[0].float().cpu()
             gt_masks = masks.float().cpu()
 
+            pixel_acc = [torch.eq((pred_masks.detach().sigmoid() > 0.5).to(gt_masks),
+                                  gt_masks).to(gt_masks).flatten(1, 2).mean(-1)]
+
             mask_infos = data_sample['mask_infos']
             sub_mask_ious = [compute_mask_IoU(pred_masks.flatten(1, 2), gt_masks.flatten(1, 2))[-1]]
             sub_isthing = [torch.tensor([mask_info['isthing'] for mask_info in mask_infos])]
@@ -157,10 +161,12 @@ if __name__ == '__main__':
             sub_mask_ious = gather_object(sub_mask_ious)
             sub_isthing = gather_object(sub_isthing)
             sub_plural = gather_object(sub_plural)
+            pixel_acc = gather_object(pixel_acc)
 
             mask_ious += sub_mask_ious
             isthing += sub_isthing
             plural += sub_plural
+            pixel_accs += pixel_acc
 
     if accelerator.is_main_process:
         mask_ious = torch.cat(mask_ious)
@@ -175,6 +181,9 @@ if __name__ == '__main__':
 
         accuracy = (mask_ious > 0.5).float().mean()
 
+        pixel_accs = torch.cat(pixel_accs).mean()
+
 
         print(f"aIoU: {AA}, aIoU_singulars: {AA_singulars}, aIoU_plurals: {AA_plurals}, "
-              f"aIoU_things: {AA_things}, aIoU_stuff: {AA_stuff}, aAcc@0.5: {accuracy}", flush=True)
+              f"aIoU_things: {AA_things}, aIoU_stuff: {AA_stuff}, aAcc@0.5: {accuracy}, "
+              f"pixel_accs: {pixel_accs}", flush=True)
