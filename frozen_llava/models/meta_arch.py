@@ -142,11 +142,17 @@ class FrozenLlava(BaseModel):
                 pred_masks.view(mask_cnt, -1), gt_masks.view(mask_cnt, -1),
                 avg_factor=mask_cnt) * mask_cnt
 
+            weight = torch.ones_like(pred_masks.view(-1))
+            num_pos = gt_masks.sum()
+            num_neg = mask_cnt*fine_image_feature_h*fine_image_feature_w - num_pos
+            weight[gt_masks.view(-1) > 0] /= (num_pos + 1e-12)
+            weight[gt_masks.view(-1) < 1] /= (num_neg + 1e-12)
             # mask loss
             loss_mask += self.loss_mask(
                 pred_masks.view(-1),
                 gt_masks.view(-1),
-                avg_factor=mask_cnt*fine_image_feature_h*fine_image_feature_w) * mask_cnt
+                weight=weight,
+                avg_factor=1) * mask_cnt
             acc = torch.eq((pred_masks.detach().sigmoid() > 0.5).to(gt_masks),
                            gt_masks).to(gt_masks).mean()
             accuracy += acc * mask_cnt
