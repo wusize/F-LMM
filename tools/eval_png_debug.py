@@ -64,7 +64,7 @@ if __name__ == '__main__':
     isthing = []
     plural = []
     pixel_accs = []
-    for idx in tqdm(range(100)):
+    for idx in tqdm(range(len(png_dataset))):
         data_sample = png_dataset[idx]
         assert data_sample['pixel_values'].shape[0] > 1
         inputs = dict(input_ids=data_sample['input_ids'][None].to(llm.device),
