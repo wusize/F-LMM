@@ -113,7 +113,9 @@ train_dataloader = dict(
         tokenizer=tokenizer,
         image_processor=image_processor,
         prompt_template=prompt_template,
-        local_path='data/coco/train2017'),
+        local_path='data/coco/train2017',
+        ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017'
+    ),
     sampler=dict(type=DefaultSampler, shuffle=True),
     collate_fn=dict(type=gcg_collate_fn))
 
