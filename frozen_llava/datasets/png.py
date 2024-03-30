@@ -21,7 +21,7 @@ from mmengine.fileio import get
 from panopticapi import utils
 
 
-class GCGDataset(Dataset):
+class PNGDataset(Dataset):
     def __init__(self,
                  json_file,
                  panoptic_json_file,
@@ -38,8 +38,14 @@ class GCGDataset(Dataset):
         self.FILE_CLIENT = None
         self.use_ceph = (Client is not None) and (ceph_path is not None)
 
-        self.tokenizer = BUILDER.build(tokenizer)
-        self.image_processor = BUILDER.build(image_processor)
+        if isinstance(tokenizer, dict):
+            self.tokenizer = BUILDER.build(tokenizer)
+        else:
+            self.tokenizer = tokenizer
+        if isinstance(image_processor, dict):
+           self.image_processor = BUILDER.build(image_processor)
+        else:
+            self.image_processor = image_processor
         self.prompt = self.tokenizer.encode(
             prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
             add_special_tokens=True)
@@ -74,7 +80,7 @@ class GCGDataset(Dataset):
         data_sample = self.data[index]
         mask_cnt = 0
         caption_input_ids = []
-        mask_ids = []
+        mask_ids = [-1]*len(self.prompt)
         mask_segment_ids = []
         for segment in data_sample['segments']:
             segment_input_ids = self.tokenizer.encode(segment['utterance'], add_special_tokens=False)
@@ -100,7 +106,7 @@ class GCGDataset(Dataset):
         for mask_segment_ids_ in mask_segment_ids:
             mask = 0
             for segment_id in mask_segment_ids_:
-                mask += (segm_map == segment_id).astype(np.uint8)
+                mask += (segm_map == int(segment_id)).astype(np.uint8)
             masks.append(np.clip(mask, a_max=1, a_min=0))
         assert len(masks) == mask_cnt
 
@@ -135,3 +141,27 @@ class GCGDataset(Dataset):
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]))
+
+
+if __name__ == '__main__':
+    from xtuner.utils.templates import PROMPT_TEMPLATE
+    prompt_template = PROMPT_TEMPLATE.mistral
+    from transformers import AutoTokenizer
+    from transformers import AutoTokenizer
+    from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
+    from tqdm import tqdm
+    dataset = PNGDataset(json_file='data/png_coco_train2017.json',
+                         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+                         panoptic_png_path='data/coco/panoptic_train2017',
+                         tokenizer=dict(
+                             type=AutoTokenizer.from_pretrained,
+                             pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                         image_processor=dict(
+                             type=CustomLlavaNextImageProcessor.from_pretrained,
+                             pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                         prompt_template=prompt_template,
+                         local_path='data/coco/train2017'
+                         )
+
+    for i in tqdm(range(len(dataset))):
+        data = dataset.__getitem__(i)

@@ -15,8 +15,6 @@ except:
 
 import pycocotools.mask as mask_utils
 from pycocotools.coco import COCO
-from transformers import AutoTokenizer
-from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from xtuner.registry import BUILDER
 from typing import Dict, Sequence
 from tqdm import tqdm
@@ -46,9 +44,14 @@ class GCGDataset(Dataset):
         self.local_path = local_path
         self.FILE_CLIENT = None
         self.use_ceph = (Client is not None) and (ceph_path is not None)
-
-        self.tokenizer = BUILDER.build(tokenizer)
-        self.image_processor = BUILDER.build(image_processor)
+        if isinstance(tokenizer, dict):
+            self.tokenizer = BUILDER.build(tokenizer)
+        else:
+            self.tokenizer = tokenizer
+        if isinstance(image_processor, dict):
+           self.image_processor = BUILDER.build(image_processor)
+        else:
+            self.image_processor = image_processor
         self.prompt = self.tokenizer.encode(
             prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
             add_special_tokens=True)
@@ -379,6 +382,8 @@ class MuseForGCGDataset(GCGDataset):
 if __name__ == '__main__':
     dataset_list = []
     from xtuner.utils.templates import PROMPT_TEMPLATE
+    from transformers import AutoTokenizer
+    from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
     prompt_template = PROMPT_TEMPLATE.mistral
     ha_dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
                             local_path='data/GranDf_HA_images/train',
