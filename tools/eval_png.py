@@ -123,7 +123,7 @@ if __name__ == '__main__':
             pred_masks = mask_head(attention_maps)[:, 0]
 
         pred_masks = (F.interpolate(pred_masks.to(masks)[None].sigmoid().float(),
-                                    size=masks.shape[-2:]) > 0.5).float().cpu()
+                                    size=masks.shape[-2:]) > 0.5)[0].float().cpu()
         gt_masks = masks.float().cpu()
 
 
