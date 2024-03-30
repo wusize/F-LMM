@@ -153,15 +153,15 @@ if __name__ == '__main__':
             sub_plural = [torch.tensor([mask_info['plural'] for mask_info in mask_infos])]
             pixel_acc = [torch.eq(pred_masks, gt_masks).float().flatten(1, 2).mean(-1)]
 
-            sub_mask_ious = gather_object(sub_mask_ious)
-            sub_isthing = gather_object(sub_isthing)
-            sub_plural = gather_object(sub_plural)
-            pixel_acc = gather_object(pixel_acc)
-
             mask_ious += sub_mask_ious
             isthing += sub_isthing
             plural += sub_plural
             pixel_accs += pixel_acc
+
+        mask_ious = gather_object(mask_ious)
+        isthing = gather_object(isthing)
+        plural = gather_object(plural)
+        pixel_accs = gather_object(pixel_accs)
 
     if accelerator.is_main_process:
         mask_ious = torch.cat(mask_ious)
