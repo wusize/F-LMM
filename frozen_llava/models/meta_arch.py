@@ -151,7 +151,7 @@ class FrozenLlava(BaseModel):
                            gt_masks).to(gt_masks).mean()
             accuracy += acc * mask_cnt
             aiou += compute_mask_IoU((pred_masks.detach().sigmoid() > 0.5).to(gt_masks).view(mask_cnt, -1),
-                                     gt_masks.view(mask_cnt, -1)) * mask_cnt
+                                     gt_masks.view(mask_cnt, -1)).mean() * mask_cnt
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
