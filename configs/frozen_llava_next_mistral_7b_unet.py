@@ -131,15 +131,15 @@ datasets_list = [
          prompt_template=prompt_template,
          tokenizer=tokenizer,
          image_processor=image_processor),
-    dict(type=PNGDataset,
-         json_file='data/png_coco_train2017.json',
-         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-         panoptic_png_path='data/coco/panoptic_train2017',
-         tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt_template=prompt_template,
-         local_path='data/coco/train2017',
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
+    # dict(type=PNGDataset,
+    #      json_file='data/png_coco_train2017.json',
+    #      panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+    #      panoptic_png_path='data/coco/panoptic_train2017',
+    #      tokenizer=tokenizer,
+    #      image_processor=image_processor,
+    #      prompt_template=prompt_template,
+    #      local_path='data/coco/train2017',
+    #      ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
 ]
 
 train_dataloader = dict(
