@@ -134,7 +134,7 @@ if __name__ == '__main__':
         mask_infos = data_sample['mask_infos']
         isthing.append(torch.tensor([mask_info['isthing'] for mask_info in mask_infos]))
         plural.append(torch.tensor([mask_info['plural'] for mask_info in mask_infos]))
-        pixel_accs.append(torch.eq(pred_masks, gt_masks).flatten(1, 2).mean(-1))
+        pixel_accs.append(torch.eq(pred_masks, gt_masks).float().flatten(1, 2).mean(-1))
 
     mask_ious = torch.cat(mask_ious)
     isthing = torch.cat(isthing)
