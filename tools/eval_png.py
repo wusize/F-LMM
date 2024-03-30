@@ -37,9 +37,11 @@ if __name__ == '__main__':
                pretrained_model_name_or_path=llm['pretrained_model_name_or_path'],
                torch_dtype=torch.float16,
                device_map='auto')
-    
+
     llm = BUILDER.build(llm)
     mask_head = BUILDER.build(mask_head).to(dtype=llm.dtype, device=llm.device)
+    llm.eval()
+    mask_head.eval()
     if args.checkpoint is not None:
         state_dict = guess_load_checkpoint(args.checkpoint)
         if args.checkpoint_prefix is None:
