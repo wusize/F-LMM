@@ -52,6 +52,8 @@ if __name__ == '__main__':
                device_map={"": accelerator.process_index},)
     llm = BUILDER.build(llm)
     mask_head = BUILDER.build(mask_head).to(dtype=llm.dtype, device=llm.device)
+    llm.eval()
+    mask_head.eval()
     if args.checkpoint is not None:
         state_dict = guess_load_checkpoint(args.checkpoint)
         if args.checkpoint_prefix is None:
