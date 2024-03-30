@@ -51,13 +51,13 @@ llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
 unet = dict(type=UNetHead,
             in_channels=2048,
             base_channels=64,
-            num_stages=4,
-            strides=(1, 1, 1, 1),
-            enc_num_convs=(2, 2, 2, 2),   # the first enc is for projection
-            dec_num_convs=(2, 2, 2),
-            downsamples=(True, True, True),
-            enc_dilations=(1, 1, 1, 1),
-            dec_dilations=(1, 1, 1),
+            num_stages=3,
+            strides=(1, 1, 1,),
+            enc_num_convs=(2, 2, 2,),   # the first enc is for projection
+            dec_num_convs=(2, 2,),
+            downsamples=(True, True,),
+            enc_dilations=(1, 1, 1,),
+            dec_dilations=(1, 1,),
             norm_cfg=dict(type=GroupNorm, num_groups=1),
             upsample_cfg=dict(type=InterpConv)
             )
