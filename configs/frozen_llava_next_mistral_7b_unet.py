@@ -11,7 +11,7 @@ from xtuner.engine.runner import TrainLoop
 from mmengine.dataset import DefaultSampler
 from frozen_llava.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
                                        concat_datasets, gcg_collate_fn)
-from frozen_llava.datasets.png import PNGDataset
+# from frozen_llava.datasets.png import PNGDataset
 from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
 from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from frozen_llava.models.meta_arch import FrozenLlava
@@ -53,7 +53,7 @@ unet = dict(type=UNetHead,
             base_channels=64,
             num_stages=4,
             strides=(1, 1, 1, 1),
-            enc_num_convs=(1, 2, 2, 2),   # the first enc is for projection
+            enc_num_convs=(2, 2, 2, 2),   # the first enc is for projection
             dec_num_convs=(2, 2, 2),
             downsamples=(True, True, True),
             enc_dilations=(1, 1, 1, 1),
@@ -79,6 +79,7 @@ image_processor = dict(
 
 model = dict(
     type=FrozenLlava,
+    merge='max',
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),

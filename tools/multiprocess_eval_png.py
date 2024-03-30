@@ -3,7 +3,7 @@ import torch.nn.functional as F
 import argparse
 from frozen_llava.datasets.png import PNGDataset
 from tqdm import tqdm
-
+from functools import partial
 from xtuner.registry import BUILDER
 from mmengine.config import Config
 from xtuner.model.utils import guess_load_checkpoint
@@ -12,6 +12,16 @@ from accelerate.utils import gather_object
 
 
 accelerator = Accelerator()
+
+
+def apply_merge(x, merge_type='mean', dim=1):
+    if merge_type == 'mean':
+        return x.mean(dim=dim)
+    elif merge_type == 'max':
+        return x.max(dim=dim).values
+    else:
+        raise NotImplementedError
+
 
 def compute_mask_IoU(masks, target):
     temp = masks * target
@@ -41,7 +51,7 @@ if __name__ == '__main__':
     image_processor= cfg.image_processor
     llm = cfg.model.model
     mask_head = cfg.model.mask_head
-    
+    merge_func = partial(apply_merge, merge_type=cfg.model.get('merge', 'mean'))
     llm = dict(type=llm['type'],
                pretrained_model_name_or_path=llm['pretrained_model_name_or_path'],
                torch_dtype=torch.float16,
@@ -121,9 +131,9 @@ if __name__ == '__main__':
                 assert matched.sum() > 0
 
                 mask_attentions_with_coarse = torch.cat(
-                    [torch.mean(attn[:, matched], dim=1) for attn in attentions_with_coarse])
+                    [merge_func(attn[:, matched], dim=1) for attn in attentions_with_coarse])
                 mask_attentions_with_fine = torch.cat(
-                    [torch.mean(attn[:, matched], dim=1) for attn in attentions_with_fine])
+                    [merge_func(attn[:, matched], dim=1) for attn in attentions_with_fine])
                 attentions_with_coarse_list.append(mask_attentions_with_coarse)
                 attentions_with_fine_list.append(mask_attentions_with_fine)
 
