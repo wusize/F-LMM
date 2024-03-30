@@ -27,8 +27,6 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint_prefix', default='mask_head.', type=str)
     args = parser.parse_args()
 
-
-
     accelerator = Accelerator()
     # each GPU creates a string
     message = [f"Hello this is GPU {accelerator.process_index}"]
@@ -36,8 +34,6 @@ if __name__ == '__main__':
     messages = gather_object(message)
     # output the messages only on the main process with accelerator.print()
     accelerator.print(messages)
-
-
 
     cfg = Config.fromfile(args.config)
     prompt_template = cfg.prompt_template
@@ -75,6 +71,7 @@ if __name__ == '__main__':
     mask_ious = []
     isthing = []
     plural = []
+    pixel_accs = []
 
     # sync GPUs and start the timer
     accelerator.wait_for_everyone()
@@ -141,26 +138,30 @@ if __name__ == '__main__':
             ], dim=1).to(llm.dtype)
             del attentions_with_coarse, attentions_with_fine
 
-
             with torch.no_grad():
                 pred_masks = mask_head(attention_maps)[:, 0]
-
-            pred_masks = (F.interpolate(pred_masks.to(masks)[None].sigmoid().float(),
-                                        size=masks.shape[-2:]) > 0.5)[0].float().cpu()
+            pred_masks = F.interpolate(pred_masks[None].float().sigmoid(),
+                                       size=masks.shape[-2:])[0].cpu()
+            pred_masks = (pred_masks > 0.5).float()
             gt_masks = masks.float().cpu()
+            assert pred_masks.shape == gt_masks.shape
+            mask_cnt = pred_masks.shape[0]
 
             mask_infos = data_sample['mask_infos']
             sub_mask_ious = [compute_mask_IoU(pred_masks.flatten(1, 2), gt_masks.flatten(1, 2))[-1]]
             sub_isthing = [torch.tensor([mask_info['isthing'] for mask_info in mask_infos])]
             sub_plural = [torch.tensor([mask_info['plural'] for mask_info in mask_infos])]
+            pixel_acc = [torch.eq(pred_masks, gt_masks).float().flatten(1, 2).mean(-1)]
 
             sub_mask_ious = gather_object(sub_mask_ious)
             sub_isthing = gather_object(sub_isthing)
             sub_plural = gather_object(sub_plural)
+            pixel_acc = gather_object(pixel_acc)
 
             mask_ious += sub_mask_ious
             isthing += sub_isthing
             plural += sub_plural
+            pixel_accs += pixel_acc
 
     if accelerator.is_main_process:
         mask_ious = torch.cat(mask_ious)
@@ -175,6 +176,8 @@ if __name__ == '__main__':
 
         accuracy = (mask_ious > 0.5).float().mean()
 
+        pixel_accs = torch.cat(pixel_accs).mean()
 
         print(f"aIoU: {AA}, aIoU_singulars: {AA_singulars}, aIoU_plurals: {AA_plurals}, "
-              f"aIoU_things: {AA_things}, aIoU_stuff: {AA_stuff}, aAcc@0.5: {accuracy}", flush=True)
+              f"aIoU_things: {AA_things}, aIoU_stuff: {AA_stuff}, aAcc@0.5: {accuracy}, "
+              f"pixel_accs: {pixel_accs}", flush=True)
