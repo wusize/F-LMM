@@ -166,7 +166,7 @@ if __name__ == '__main__':
             pred_masks = (pred_masks > 0.5).float()
 
             if sam_predictor is not None:
-                image = np.array(data_sample['image'])
+                image = np.array(data_sample['image'].to('RGB'))
                 sam_predictor.set_image(image)
                 sam_masks = []
                 prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0].numpy()
