@@ -16,15 +16,19 @@ class FrozenLlava(BaseModel):
     def __init__(self,
                  model,
                  mask_head,
+                 use_image_hidden_states=False,
                  merge='mean',
                  loss_mask=None,
                  loss_dice=None):
         super().__init__()
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
+        in_channels = (self.llava.config.text_config.num_attention_heads *
+                       self.llava.config.text_config.num_hidden_layers*2)
+        if use_image_hidden_states:
+            in_channels += self.llava.config.vision_config.hidden_size
         mask_head.update(
-            in_channels=self.llava.config.text_config.num_attention_heads*
-                        self.llava.config.text_config.num_hidden_layers*2)
+            in_channels=in_channels)
         self.mask_head = BUILDER.build(mask_head)
         self.patch_size = self.llava.config.vision_config.patch_size
         self.merge = merge
@@ -32,6 +36,7 @@ class FrozenLlava(BaseModel):
 
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
+        self.use_image_hidden_states = use_image_hidden_states
 
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
@@ -88,6 +93,7 @@ class FrozenLlava(BaseModel):
             mask_ids = outputs['mask_ids']
             attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                           for attn in outputs.attentions]
+            image_hidden_states = outputs.image_hidden_states[0]
             del outputs
 
             coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
@@ -130,11 +136,16 @@ class FrozenLlava(BaseModel):
             del attentions_with_coarse, attentions_with_fine
             attention_maps.requires_grad = True
             # print(f"============={attention_maps.dtype}===========", flush=True)
+            mask_cnt = attention_maps.shape[0]
+            if self.use_image_hidden_states:
+                attention_maps = torch.cat([attention_maps,
+                                            image_hidden_states[None].repeat(mask_cnt, 1, 1, 1)],
+                                           dim=1)
+            del image_hidden_states
             pred_masks = self.mask_head(attention_maps)[:, 0]
             gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
                                      size=(fine_image_feature_h, fine_image_feature_w))[0].to(self.llava.dtype)
             assert pred_masks.shape == gt_masks.shape
-            mask_cnt = pred_masks.shape[0]
             mask_cnts += mask_cnt
 
             # dice loss

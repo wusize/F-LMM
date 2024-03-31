@@ -224,7 +224,7 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
             else self.config.vision_feature_select_strategy
         )
         image_feature_shapes = []
-
+        clip_image_features = None
         if inputs_embeds is None:
             # 1. Extract the input embeddings
             inputs_embeds = self.get_input_embeddings()(input_ids)
@@ -249,15 +249,19 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                 # if we assume each image has 5 image features (base image + 4 patches)
                 split_sizes = [image.shape[0] for image in pixel_values]
                 image_features = torch.split(image_features, split_sizes, dim=0)
+                clip_image_features = torch.split(selected_image_feature, split_sizes, dim=0)
 
                 # NOTE we only support multimodal_patch_merge_type == "spatial_unpad"
                 height = width = self.config.vision_config.image_size // self.config.vision_config.patch_size
 
                 new_image_features = []
-                for image_idx, image_feature in enumerate(image_features):
+                clip_image_features_list = []
+                for image_idx, (image_feature, clip_image_feature) in enumerate(
+                        zip(image_features, clip_image_features)):
                     if image_feature.shape[0] > 1:
                         base_image_feature = image_feature[0]
                         image_feature = image_feature[1:]
+                        clip_image_feature = clip_image_feature[1:]
 
                         if height * width != base_image_feature.shape[0]:
                             raise ValueError("The number of patches is not consistent with the image size.")
@@ -270,6 +274,13 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                         image_feature = image_feature.permute(4, 0, 2, 1, 3).contiguous()
                         image_feature = image_feature.flatten(1, 2).flatten(2, 3)
                         image_feature = unpad_image(image_feature, image_sizes[image_idx])
+
+                        clip_image_feature = clip_image_feature.view(
+                            num_patch_height, num_patch_width, height, width, -1)
+                        clip_image_feature = clip_image_feature.permute(4, 0, 2, 1, 3).contiguous()
+                        clip_image_feature = clip_image_feature.flatten(1, 2).flatten(2, 3)
+                        clip_image_feature = unpad_image(clip_image_feature, image_sizes[image_idx])
+
                         image_feature_shapes.append(image_feature.shape[1:])
                         image_feature = torch.cat(
                             (
@@ -284,8 +295,10 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                         image_feature_shapes.append(None)
                         image_feature = image_feature[0]
                         image_feature = torch.cat((image_feature, self.image_newline[None]), dim=0)
+                    clip_image_features_list.append(clip_image_feature)
                     new_image_features.append(image_feature)
                 image_features = torch.stack(new_image_features, dim=0)
+                clip_image_features = clip_image_features_list
 
                 inputs_embeds, attention_mask, labels, position_ids, mask_ids, image_to_overwrite \
                     = self._merge_input_ids_with_image_features(image_features,
@@ -369,5 +382,6 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
             attentions=outputs.attentions,
             image_to_overwrite=image_to_overwrite,
             mask_ids=mask_ids,
-            image_feature_shapes=image_feature_shapes
+            image_feature_shapes=image_feature_shapes,
+            image_hidden_states=clip_image_features,
         )
