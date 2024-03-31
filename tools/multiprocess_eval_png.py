@@ -158,6 +158,7 @@ if __name__ == '__main__':
                               size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
             ], dim=1).to(llm.dtype)
             del attentions_with_coarse, attentions_with_fine
+            gt_masks = masks.float().cpu()
 
             with torch.no_grad():
                 pred_masks = mask_head(attention_maps)[:, 0]
@@ -169,8 +170,8 @@ if __name__ == '__main__':
                 image = np.array(data_sample['image'].convert('RGB'))
                 sam_predictor.set_image(image)
                 sam_masks = []
-                prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0]
-                for prompt_mask, pred_mask in zip(prompt_masks, pred_masks):
+                prompt_masks = F.interpolate(gt_masks[None], size=(256, 256))[0]
+                for prompt_mask, pred_mask in zip(prompt_masks, gt_masks):
                     import pdb; pdb.set_trace()
                     sam_outputs = sam_predictor.predict(
                         mask_input=prompt_mask[None].numpy())
@@ -183,7 +184,6 @@ if __name__ == '__main__':
 
                 pred_masks = torch.stack(sam_masks).float()
 
-            gt_masks = masks.float().cpu()
             assert pred_masks.shape == gt_masks.shape
             mask_cnt = pred_masks.shape[0]
 
