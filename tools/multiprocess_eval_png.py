@@ -203,7 +203,7 @@ if __name__ == '__main__':
                     prompt_box = mask2box(pred_mask.numpy())
                     sam_outputs = sam_predictor.predict(
                         box=prompt_box,
-                        mask_input=prompt_mask[None].numpy())
+                        mask_input=prompt_mask[None])
                     candidate_masks = torch.from_numpy(sam_outputs[0]).float()
                     candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
                                                       pred_mask.view(1, -1))[-1]
