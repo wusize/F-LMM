@@ -135,6 +135,7 @@ class PNGDataset(Dataset):
         resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
 
         h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
+        gt_masks = masks.clone()
         masks = F.interpolate(masks[None], size=(h, w))[0]
 
         p_h, p_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
@@ -151,6 +152,7 @@ class PNGDataset(Dataset):
                     resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
+                    gt_masks=gt_masks,
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
                     mask_infos=mask_infos,
                     image=image)

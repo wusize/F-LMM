@@ -133,7 +133,7 @@ if __name__ == '__main__':
                     *attn.shape[:-1], fine_image_feature_h, fine_image_feature_w + 1
                 )[..., :-1] for attn in attentions]
             del attentions
-            masks = data_sample['masks'].to(llm.device)
+            masks = data_sample['gt_masks'].to(llm.device)
 
             attentions_with_coarse_list = []
             attentions_with_fine_list = []
