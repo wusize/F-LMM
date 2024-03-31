@@ -176,7 +176,7 @@ if __name__ == '__main__':
                     sam_mask = torch.from_numpy(sam_outputs[0][sam_outputs[1].argmax()])
                     sam_masks.append(sam_mask)
 
-                pred_masks = torch.stack(sam_masks)
+                pred_masks = torch.stack(sam_masks).float()
 
             gt_masks = masks.float().cpu()
             assert pred_masks.shape == gt_masks.shape
