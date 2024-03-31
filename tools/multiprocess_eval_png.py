@@ -172,6 +172,7 @@ if __name__ == '__main__':
                 prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0].numpy()
 
                 for prompt_mask in prompt_masks:
+                    import pdb; pdb.set_trace()
                     sam_outputs = sam_predictor.predict(mask_input=prompt_mask[None])
                     sam_mask = torch.from_numpy(sam_outputs[0][sam_outputs[1].argmax()])
                     sam_masks.append(sam_mask)
