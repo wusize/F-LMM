@@ -152,7 +152,8 @@ class PNGDataset(Dataset):
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
-                    mask_infos=mask_infos)
+                    mask_infos=mask_infos,
+                    image=image)
 
 
 if __name__ == '__main__':

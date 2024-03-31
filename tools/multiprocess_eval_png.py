@@ -1,3 +1,4 @@
+import numpy as np
 import torch
 import torch.nn.functional as F
 import argparse
@@ -35,6 +36,8 @@ if __name__ == '__main__':
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--checkpoint_prefix', default='mask_head.', type=str)
+    parser.add_argument('--sam_model', default=None, type=str)
+    parser.add_argument('--sam_checkpoint', default=None, type=str)
     args = parser.parse_args()
 
     accelerator = Accelerator()
@@ -58,6 +61,14 @@ if __name__ == '__main__':
                device_map={"": accelerator.process_index},)
     llm = BUILDER.build(llm)
     mask_head = BUILDER.build(mask_head).to(dtype=llm.dtype, device=llm.device)
+    if args.sam_model is not None:
+        from segment_anything import SamPredictor, sam_model_registry
+        sam = sam_model_registry[args.sam_model](checkpoint=args.sam_checkpoint).to(device=llm.device)
+        sam.eval()
+        sam_predictor = SamPredictor(sam)
+    else:
+        sam_predictor = None
+
     llm.eval()
     mask_head.eval()
     if args.checkpoint is not None:
@@ -153,6 +164,20 @@ if __name__ == '__main__':
             pred_masks = F.interpolate(pred_masks[None].float().sigmoid(),
                                        size=masks.shape[-2:])[0].cpu()
             pred_masks = (pred_masks > 0.5).float()
+
+            if sam_predictor is not None:
+                image = np.array(data_sample['image'])
+                sam_predictor.set_image(image)
+                sam_masks = []
+                prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0].numpy()
+
+                for prompt_mask in prompt_masks:
+                    sam_outputs = sam_predictor.predict(mask_input=prompt_mask[None])
+                    sam_mask = torch.from_numpy(sam_outputs[0][sam_outputs[1].argmax()])
+                    sam_masks.append(sam_mask)
+
+                pred_masks = torch.stack(sam_masks)
+
             gt_masks = masks.float().cpu()
             assert pred_masks.shape == gt_masks.shape
             mask_cnt = pred_masks.shape[0]
