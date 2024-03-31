@@ -31,6 +31,26 @@ def compute_mask_IoU(masks, target):
     return intersection, union, intersection / (union + 1e-12)
 
 
+def mask2box(mask):
+    ys, xs = np.where(mask)
+    y0, y1 = ys.min(), ys.max()
+    x0, x1 = xs.min(), xs.max()
+
+    return np.array([x0, y0, x1, y1])
+
+
+def mask2logits(mask, eps=1e-3):
+    def inv_sigmoid(x):
+        return np.log(x / (1 - x))
+
+    logits = np.zeros(mask.shape, dtype="float32")
+    logits[mask > 0] = 1 - eps
+    logits[mask < 1] = eps
+    logits = inv_sigmoid(logits)
+
+    return logits
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
@@ -38,7 +58,9 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint_prefix', default='mask_head.', type=str)
     parser.add_argument('--sam_model', default=None, type=str)
     parser.add_argument('--sam_checkpoint', default=None, type=str)
+    parser.add_argument('--preserve_logits', action='store_true')
     args = parser.parse_args()
+    print(f'preserve_logits: {args.preserve_logits}', flush=True)
 
     accelerator = Accelerator()
     # each GPU creates a string
@@ -97,7 +119,7 @@ if __name__ == '__main__':
     # sync GPUs and start the timer
     accelerator.wait_for_everyone()
 
-    data_ids = list(range(len(png_dataset)))
+    data_ids = list(range(len(png_dataset)))[:100]
 
     # divide the prompt list onto the available GPUs
     with accelerator.split_between_processes(data_ids) as sub_ids:
@@ -161,19 +183,26 @@ if __name__ == '__main__':
             gt_masks = masks.float().cpu()
 
             with torch.no_grad():
-                pred_masks = mask_head(attention_maps)[:, 0]
-            pred_masks = F.interpolate(pred_masks[None].float().sigmoid(),
-                                       size=masks.shape[-2:])[0].cpu()
+                pred_mask_logits = mask_head(attention_maps)[:, 0]
+            pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
+                                       size=masks.shape[-2:], mode='bilinear')[0].cpu()
             pred_masks = (pred_masks > 0.5).float()
 
             if sam_predictor is not None:
                 image = np.array(data_sample['image'].convert('RGB'))
                 sam_predictor.set_image(image)
                 sam_masks = []
-                prompt_masks = F.interpolate(gt_masks[None], size=(256, 256))[0]
-                for prompt_mask, pred_mask in zip(prompt_masks, gt_masks):
-                    import pdb; pdb.set_trace()
+                if args.preserve_logits:
+                    prompt_masks = F.interpolate(pred_mask_logits[None].float(),
+                                                 size=(256, 256), mode='bilinear')[0].cpu().numpy()
+                else:
+                    prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0].numpy()
+                    prompt_masks = mask2logits(prompt_masks)
+
+                for prompt_mask, pred_mask in zip(prompt_masks, pred_masks):
+                    prompt_box = mask2box(pred_mask.numpy())
                     sam_outputs = sam_predictor.predict(
+                        box=prompt_box,
                         mask_input=prompt_mask[None].numpy())
                     candidate_masks = torch.from_numpy(sam_outputs[0]).float()
                     candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
