@@ -169,12 +169,16 @@ if __name__ == '__main__':
                 image = np.array(data_sample['image'].convert('RGB'))
                 sam_predictor.set_image(image)
                 sam_masks = []
-                prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0].numpy()
-
+                prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0]
                 for prompt_mask in prompt_masks:
                     import pdb; pdb.set_trace()
-                    sam_outputs = sam_predictor.predict(mask_input=prompt_mask[None])
-                    sam_mask = torch.from_numpy(sam_outputs[0][sam_outputs[1].argmax()])
+                    sam_outputs = sam_predictor.predict(
+                        mask_input=prompt_mask[None].numpy())
+                    candidate_masks = torch.from_numpy(sam_outputs[0]).float()
+                    candidate_ious = compute_mask_IoU(candidate_masks,
+                                                      prompt_mask[None])[-1]
+                    sam_mask = candidate_masks[candidate_ious.argmax()]
+                    # sam_mask = torch.from_numpy(sam_outputs[0][sam_outputs[1].argmax()])
                     sam_masks.append(sam_mask)
 
                 pred_masks = torch.stack(sam_masks).float()
