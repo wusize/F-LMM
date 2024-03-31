@@ -4,7 +4,7 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
-from torch.nn import BatchNorm2d
+from torch.nn import GroupNorm
 from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
@@ -58,7 +58,7 @@ unet = dict(type=UNetHead,
             downsamples=(True, True, True),
             enc_dilations=(1, 1, 1, 1),
             dec_dilations=(1, 1, 1),
-            norm_cfg=dict(type=BatchNorm2d),
+            norm_cfg=dict(type=GroupNorm, num_groups=1),
             upsample_cfg=dict(type=InterpConv)
             )
 # fcn = dict(type=FCNHead,
@@ -67,7 +67,7 @@ unet = dict(type=UNetHead,
 #            in_channels=2048,
 #            channels=256,
 #            concat_input=True,
-#            norm_cfg=dict(type=BatchNorm2d),
+#            norm_cfg=dict(type=GroupNorm, num_groups=1),
 #            )
 
 tokenizer = dict(
