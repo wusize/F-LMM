@@ -175,8 +175,8 @@ if __name__ == '__main__':
                     sam_outputs = sam_predictor.predict(
                         mask_input=prompt_mask[None].numpy())
                     candidate_masks = torch.from_numpy(sam_outputs[0]).float()
-                    candidate_ious = compute_mask_IoU(candidate_masks,
-                                                      pred_mask[None])[-1]
+                    candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
+                                                      pred_mask.view(1, -1))[-1]
                     sam_mask = candidate_masks[candidate_ious.argmax()]
                     # sam_mask = torch.from_numpy(sam_outputs[0][sam_outputs[1].argmax()])
                     sam_masks.append(sam_mask)
