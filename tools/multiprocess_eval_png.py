@@ -219,11 +219,11 @@ if __name__ == '__main__':
 
                 for prompt_mask, pred_mask, mask_point in zip(
                         prompt_masks, pred_masks, mask_points):
-                    # prompt_box = mask2box(pred_mask.numpy())   # todo: use points
+                    prompt_box = mask2box(pred_mask.numpy())
                     sam_outputs = sam_predictor.predict(
-                        # box=prompt_box,
-                        point_coords=mask_point,
-                        point_labels=np.ones(len(mask_point)),
+                        box=prompt_box,
+                        # point_coords=mask_point,
+                        # point_labels=np.ones(len(mask_point)),
                         # mask_input=prompt_mask[None]
                     )
                     candidate_masks = torch.from_numpy(sam_outputs[0]).float()
