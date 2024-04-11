@@ -39,6 +39,14 @@ def mask2box(mask):
     return np.array([x0, y0, x1, y1])
 
 
+def mask2point(mask, image_h, image_w):
+    h, w = mask.shape
+    ys, xs = np.where(mask)
+    ys, xs = (image_h * (ys.astype(np.float32) + 0.5) / h,
+              image_w * (xs.astype(np.float32) + 0.5) / w)
+    return np.stack([xs, ys], axis=1)
+
+
 def mask2logits(mask, eps=1e-3):
     def inv_sigmoid(x):
         return np.log(x / (1 - x))
@@ -184,13 +192,23 @@ if __name__ == '__main__':
 
             with torch.no_grad():
                 pred_mask_logits = mask_head(attention_maps)[:, 0]
+
+            if sam_predictor is not None:
+                image = np.array(data_sample['image'].convert('RGB'))
+                sam_predictor.set_image(image)
+                mask_points = [mask2point((m > 0.5).float().cpu().numpy(),
+                                          *sam_predictor.original_size)
+                               for m in pred_mask_logits.float().sigmoid()]
+            else:
+                mask_points = [None] * len(pred_mask_logits)
+
             pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
                                        size=masks.shape[-2:], mode='bilinear')[0].cpu()
             pred_masks = (pred_masks > 0.5).float()
 
             if sam_predictor is not None:
-                image = np.array(data_sample['image'].convert('RGB'))
-                sam_predictor.set_image(image)
+                # image = np.array(data_sample['image'].convert('RGB'))
+                # sam_predictor.set_image(image)
                 sam_masks = []
                 if args.preserve_logits:
                     prompt_masks = F.interpolate(pred_mask_logits[None].float(),
@@ -199,11 +217,15 @@ if __name__ == '__main__':
                     prompt_masks = F.interpolate(pred_masks[None], size=(256, 256))[0].numpy()
                     prompt_masks = mask2logits(prompt_masks)
 
-                for prompt_mask, pred_mask in zip(prompt_masks, pred_masks):
-                    prompt_box = mask2box(pred_mask.numpy())
+                for prompt_mask, pred_mask, mask_point in zip(
+                        prompt_masks, pred_masks, mask_points):
+                    # prompt_box = mask2box(pred_mask.numpy())   # todo: use points
                     sam_outputs = sam_predictor.predict(
-                        box=prompt_box,
-                        mask_input=prompt_mask[None])
+                        # box=prompt_box,
+                        point_coords=mask_point,
+                        point_labels=np.ones(len(mask_point)),
+                        # mask_input=prompt_mask[None]
+                    )
                     candidate_masks = torch.from_numpy(sam_outputs[0]).float()
                     candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
                                                       pred_mask.view(1, -1))[-1]
