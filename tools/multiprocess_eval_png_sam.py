@@ -116,12 +116,10 @@ if __name__ == '__main__':
 
         for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
             data_sample = png_dataset[idx]
-            masks = data_sample['gt_masks'].to(model.llm.device)
-
-            gt_masks = masks.float().cpu()
-
             with torch.no_grad():
                 pred_mask_logits = model.predict(data_sample)
+            masks = data_sample['gt_masks'].to(pred_mask_logits.device)
+            gt_masks = masks.float().cpu()
 
             pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
                                        size=masks.shape[-2:], mode='bilinear')[0].cpu()
