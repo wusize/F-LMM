@@ -52,7 +52,7 @@ class FrozenLlavaSAM(FrozenLlava):
             mask_ids = outputs['mask_ids']
             attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                           for attn in outputs.attentions]
-            hidden_states = outputs.hidden_states
+            hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
             del outputs
 
             coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
