@@ -23,7 +23,11 @@ class MLPBlock(nn.Module):
         self.act = act()
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.lin2(self.act(self.lin1(x)))
+        x = self.lin1(x)
+        x = self.act(x)
+        x = self.lin2(x)
+        return x
+        # return self.lin2(self.act(self.lin1(x)))
 
 
 # From https://github.com/facebookresearch/detectron2/blob/main/detectron2/layers/batch_norm.py # noqa
