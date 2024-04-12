@@ -158,7 +158,7 @@ class Sam(nn.Module):
             align_corners=False,
         ).to(masks)
         masks = masks[..., : input_size[0], : input_size[1]]
-        masks = F.interpolate(masks, original_size, mode="bilinear", align_corners=False)
+        masks = F.interpolate(masks.float(), original_size, mode="bilinear", align_corners=False).to(masks)
         return masks
 
     def preprocess(self, x: torch.Tensor) -> torch.Tensor:
