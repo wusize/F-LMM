@@ -86,7 +86,8 @@ if __name__ == '__main__':
     model = BUILDER.build(cfg.model)
     if args.checkpoint is not None:
         state_dict = guess_load_checkpoint(args.checkpoint)
-        model.load_state_dict(state_dict)
+        missing, unexpected = model.load_state_dict(state_dict, strict=False)
+        assert len(unexpected) == 0
     model = model.to(accelerator.device)
     model.eval()
 
