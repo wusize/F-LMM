@@ -90,6 +90,8 @@ class FrozenLlavaSAM(FrozenLlava):
                 # matched_seq_len, hidden_size
                 text_embeds.append(self.text_proj(matched_hidden_states.sum(0)))
 
+            del hidden_states
+
             # print('==================debug================', flush=True)
             attentions_with_coarse = torch.stack(attentions_with_coarse_list)
             attentions_with_fine = torch.stack(attentions_with_fine_list)

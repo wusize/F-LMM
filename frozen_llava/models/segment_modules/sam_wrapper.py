@@ -45,16 +45,17 @@ class SAMWrapper(nn.Module):
 
     def forward(self, image, pred_masks, text_embeds):
         # masks are in logits
+        import pdb; pdb.set_trace()
         image_embedding, original_image_size, input_size = self.encode_image(image)
         image_embedding.requires_grad = True
         prompt_masks = F.interpolate(pred_masks[:, None].float(), size=(256, 256), mode='bilinear').to(pred_masks)
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            box = mask2box(pred_mask.cpu().numpy(), original_image_size)
+            box = mask2box(pred_mask.detach().cpu().numpy(), original_image_size)
             box = self.transform.apply_boxes(box, original_image_size)
-            box_torch = torch.as_tensor(box, dtype=torch.float, device=self.device)
-            box_torch = box_torch[None, :]
+            box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
+            box_torch = box_torch[None, :]    # 1, 1, 4
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=None,
                 boxes=box_torch,
