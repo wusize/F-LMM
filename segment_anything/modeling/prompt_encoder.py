@@ -185,6 +185,7 @@ class PositionEmbeddingRandom(nn.Module):
     def _pe_encoding(self, coords: torch.Tensor) -> torch.Tensor:
         """Positionally encode points that are normalized to [0,1]."""
         # assuming coords are in [0, 1]^2 square and have d_1 x ... x d_n x 2 shape
+        coords = coords.to(self.positional_encoding_gaussian_matrix)
         coords = 2 * coords - 1
         coords = coords @ self.positional_encoding_gaussian_matrix
         coords = 2 * np.pi * coords
