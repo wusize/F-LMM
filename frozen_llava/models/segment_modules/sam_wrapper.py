@@ -32,7 +32,6 @@ class SAMWrapper(nn.Module):
     @torch.no_grad()
     def encode_image(self, image):
         image = np.array(image.convert(self.model.image_format))
-        import pdb; pdb.set_trace()
         input_image = self.transform.apply_image(image)
         input_image_torch = torch.as_tensor(input_image, device=self.model.device)
         transformed_image = input_image_torch.permute(2, 0, 1).contiguous()[None, :, :, :]
@@ -46,14 +45,12 @@ class SAMWrapper(nn.Module):
 
     def forward(self, image, pred_masks, text_embeds):
         # masks are in logits
-        import pdb; pdb.set_trace()
         image_embedding, original_image_size, input_size = self.encode_image(image)
         image_embedding.requires_grad = True
         prompt_masks = F.interpolate(pred_masks[:, None].float(), size=(256, 256), mode='bilinear').to(pred_masks)
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            import pdb; pdb.set_trace()
             box = mask2box(pred_mask.detach().cpu().numpy(), original_image_size)
             box = self.transform.apply_boxes(box, original_image_size)
             box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
@@ -71,8 +68,7 @@ class SAMWrapper(nn.Module):
                 dense_prompt_embeddings=dense_embeddings,
                 multimask_output=False,
             )
-            import pdb; pdb.set_trace()
             sam_mask = self.model.postprocess_masks(low_res_masks, input_size, original_image_size)
             sam_masks.append(sam_mask[0, 0])
-            
+
         return torch.stack(sam_masks)
