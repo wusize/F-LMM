@@ -13,7 +13,7 @@ class FrozenLlavaSAM(FrozenLlava):
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sam = SAMWrapper(model_name=sam_name, checkpoint=sam_checkpoint)
-        self.text_proj = nn.Linear(self.llava.config.vision_config.hidden_size,
+        self.text_proj = nn.Linear(self.llava.config.text_config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
         self.text_layer_weights = nn.Parameter(
             torch.ones(self.llava.config.text_config.num_hidden_layers))
