@@ -60,7 +60,8 @@ class SAMWrapper(nn.Module):
                 boxes=box_torch,
                 masks=prompt_mask.view(1, 1, 256, 256),
             )
-            sparse_embeddings = torch.cat([sparse_embeddings, text_embed[None]], dim=1)
+            sparse_embeddings = torch.cat([sparse_embeddings.to(text_embed),
+                                           text_embed[None]], dim=1)
             low_res_masks, iou_predictions = self.model.mask_decoder(
                 image_embeddings=image_embedding,
                 image_pe=self.model.prompt_encoder.get_dense_pe(),
