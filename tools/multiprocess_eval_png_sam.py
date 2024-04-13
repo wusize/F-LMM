@@ -15,13 +15,21 @@ from accelerate.utils import gather_object
 accelerator = Accelerator()
 
 
-def apply_merge(x, merge_type='mean', dim=1):
-    if merge_type == 'mean':
-        return x.mean(dim=dim)
-    elif merge_type == 'max':
-        return x.max(dim=dim).values
-    else:
-        raise NotImplementedError
+def average_accuracy(ious):
+    ious = ious.cpu().numpy()
+    accuracy = []
+    average_acc = 0
+    thresholds = np.arange(0, 1, 0.00001)
+    for t in thresholds:
+        predictions = (ious >= t).astype(int)
+        TP = np.sum(predictions)
+        a = TP / len(predictions)
+
+        accuracy.append(a)
+    for i, t in enumerate(zip(thresholds[:-1], thresholds[1:])):
+        average_acc += (np.abs(t[1] - t[0])) * accuracy[i]
+
+    return average_acc
 
 
 def compute_mask_IoU(masks, target):
@@ -149,11 +157,11 @@ if __name__ == '__main__':
         isthing = torch.cat(isthing)
         plural = torch.cat(plural)
 
-        AA = mask_ious.mean()
-        AA_singulars = mask_ious[torch.logical_not(plural)].mean()
-        AA_plurals = mask_ious[plural].mean()
-        AA_things = mask_ious[isthing].mean()
-        AA_stuff = mask_ious[torch.logical_not(isthing)].mean()
+        AA = average_accuracy(mask_ious)
+        AA_singulars = average_accuracy(mask_ious[torch.logical_not(plural)])
+        AA_plurals = average_accuracy(mask_ious[plural])
+        AA_things = average_accuracy(mask_ious[isthing])
+        AA_stuff = average_accuracy(mask_ious[torch.logical_not(isthing)])
 
         accuracy = (mask_ious > 0.5).float().mean()
 
