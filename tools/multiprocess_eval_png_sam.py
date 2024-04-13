@@ -71,12 +71,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default=None, type=str)
-    parser.add_argument('--checkpoint_prefix', default='mask_head.', type=str)
-    parser.add_argument('--sam_model', default=None, type=str)
-    parser.add_argument('--sam_checkpoint', default=None, type=str)
-    parser.add_argument('--preserve_logits', action='store_true')
     args = parser.parse_args()
-    print(f'preserve_logits: {args.preserve_logits}', flush=True)
 
     accelerator = Accelerator()
     # each GPU creates a string
@@ -117,7 +112,7 @@ if __name__ == '__main__':
     # sync GPUs and start the timer
     accelerator.wait_for_everyone()
 
-    data_ids = list(range(len(png_dataset)))[:100]
+    data_ids = list(range(len(png_dataset)))
 
     # divide the prompt list onto the available GPUs
     with accelerator.split_between_processes(data_ids) as sub_ids:
