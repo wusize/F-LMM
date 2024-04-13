@@ -51,17 +51,18 @@ class SAMWrapper(nn.Module):
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            box = mask2box(pred_mask.detach().float().cpu().numpy(), original_image_size)
-            box = self.transform.apply_boxes(box, original_image_size)
-            box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
-            box_torch = box_torch[None, :]    # 1, 1, 4
-            sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
+            # box = mask2box(pred_mask.detach().float().cpu().numpy(), original_image_size)
+            # box = self.transform.apply_boxes(box, original_image_size)
+            # box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
+            # box_torch = box_torch[None, :]    # 1, 1, 4
+            _, dense_embeddings = self.model.prompt_encoder(
                 points=None,
-                boxes=box_torch,
+                boxes=None,  # box_torch,
                 masks=prompt_mask.view(1, 1, 256, 256),
             )
-            sparse_embeddings = torch.cat([sparse_embeddings.to(dense_embeddings),
-                                           text_embed[None].to(dense_embeddings)], dim=1)
+            sparse_embeddings = text_embed[None].to(dense_embeddings)
+            # sparse_embeddings = torch.cat([sparse_embeddings.to(dense_embeddings),
+            #                                text_embed[None].to(dense_embeddings)], dim=1)
             low_res_masks, iou_predictions = self.model.mask_decoder(
                 image_embeddings=image_embedding,
                 image_pe=self.model.prompt_encoder.get_dense_pe(),
