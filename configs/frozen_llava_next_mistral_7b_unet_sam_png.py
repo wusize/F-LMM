@@ -80,7 +80,7 @@ image_processor = dict(
 
 model = dict(
     type=FrozenLlavaSAM,
-    sam_name='vit_h', sam_checkpoint='checkpoints/sam_vit_h_4b8939.pth',
+    sam_name='vit_l', sam_checkpoint='checkpoints/sam_vit_l_0b3195.pth',
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),
