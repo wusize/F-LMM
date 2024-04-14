@@ -64,13 +64,17 @@ class SAMWrapper(nn.Module):
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            box = mask2box((pred_mask.detach() > 0.0).float().cpu().numpy(), original_image_size)
-            box = self.transform.apply_boxes(box, original_image_size)
-            box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
-            box_torch = box_torch[None, :]    # 1, 1, 4
+            pred_mask_bool = pred_mask.detach() > 0.0
+            if pred_mask_bool.sum() > 0 and self.use_box:
+                box = mask2box(pred_mask_bool.float().cpu().numpy(), original_image_size)
+                box = self.transform.apply_boxes(box, original_image_size)
+                box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
+                box_torch = box_torch[None, :]    # 1, 1, 4
+            else:
+                box_torch = None
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=None,
-                boxes=box_torch if self.use_box else None,
+                boxes=box_torch,
                 masks=prompt_mask.view(1, 1, 256, 256) if self.use_mask else None,
             )
             if self.use_text:
