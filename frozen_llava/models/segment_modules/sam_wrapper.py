@@ -88,7 +88,7 @@ class SAMWrapper(nn.Module):
             sam_mask = self.model.postprocess_masks(low_res_masks, input_size, original_image_size)
 
             if self.multimask_output:
-                import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 candidate_masks = (sam_mask[0] > 0.0).float()
                 pred_mask = F.interpolate(pred_mask[None, None].float(),
                                           size=candidate_masks.shape[1:], mode='bilinear')
