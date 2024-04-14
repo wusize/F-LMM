@@ -82,7 +82,6 @@ if __name__ == '__main__':
     parser.add_argument('--sam_model', default=None, type=str)
     parser.add_argument('--sam_checkpoint', default=None, type=str)
     args = parser.parse_args()
-    print(f'preserve_logits: {args.preserve_logits}', flush=True)
 
     accelerator = Accelerator()
     # each GPU creates a string
