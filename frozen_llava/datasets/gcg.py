@@ -386,7 +386,7 @@ if __name__ == '__main__':
     dataset_list = []
     from xtuner.utils.templates import PROMPT_TEMPLATE
     from transformers import AutoTokenizer
-    from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
+    from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
     prompt_template = PROMPT_TEMPLATE.mistral
     ha_dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
                             local_path='data/GranDf_HA_images/train',

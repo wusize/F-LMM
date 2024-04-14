@@ -14,9 +14,11 @@ from frozen_llava.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOG
 from frozen_llava.datasets.png import PNGDataset
 from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
 from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
-from frozen_llava.models.meta_arch import FrozenLlavaNext
+# from frozen_llava.models.meta_arch import FrozenLlava
+from frozen_llava.models.llava_sam import FrozenLlavaNextSAM
 from frozen_llava.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
+from frozen_llava.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
 
@@ -78,7 +80,10 @@ image_processor = dict(
     pretrained_model_name_or_path=llava_name)
 
 model = dict(
-    type=FrozenLlavaNext,
+    type=FrozenLlavaNextSAM,
+    sam=dict(type=SAMWrapper,
+             use_text=False,
+             model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),

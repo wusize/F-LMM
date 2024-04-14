@@ -163,7 +163,7 @@ if __name__ == '__main__':
     prompt_template = PROMPT_TEMPLATE.mistral
     from transformers import AutoTokenizer
     from transformers import AutoTokenizer
-    from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
+    from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
     from tqdm import tqdm
     dataset = PNGDataset(json_file='data/png_coco_val2017.json',
                          panoptic_json_file='data/coco/annotations/panoptic_val2017.json',

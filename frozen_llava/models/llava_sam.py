@@ -1,11 +1,11 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from frozen_llava.models.meta_arch import FrozenLlava, compute_mask_IoU
+from frozen_llava.models.meta_arch import FrozenLlavaNext, compute_mask_IoU
 from xtuner.registry import BUILDER
 
 
-class FrozenLlavaSAM(FrozenLlava):
+class FrozenLlavaNextSAM(FrozenLlavaNext):
     def __init__(self,
                  sam,
                  sam_weight=1.0,

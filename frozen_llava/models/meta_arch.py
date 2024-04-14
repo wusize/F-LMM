@@ -12,7 +12,7 @@ def compute_mask_IoU(masks, target):
     return intersection / (union + 1e-12)
 
 
-class FrozenLlava(BaseModel):
+class FrozenLlavaNext(BaseModel):
 
     def __init__(self,
                  model,
