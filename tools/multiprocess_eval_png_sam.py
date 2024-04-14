@@ -220,6 +220,7 @@ if __name__ == '__main__':
 
                 for pred_mask in pred_masks:
                     prompt_box = mask2box(pred_mask.numpy())
+                    import pdb; pdb.set_trace()
                     sam_outputs = sam_predictor.predict(
                         box=prompt_box,
                     )

@@ -57,7 +57,8 @@ class SAMWrapper(nn.Module):
     def forward(self, image, pred_masks, text_embeds):
         # masks are in logits
         image_embedding, original_image_size, input_size = self.encode_image(image)
-        image_embedding.requires_grad = True
+        if self.training:
+            image_embedding.requires_grad = True
         prompt_masks = F.interpolate(pred_masks[:, None].float(), size=(256, 256), mode='bilinear').to(pred_masks)
 
         pred_masks = F.interpolate(pred_masks.detach()[None].float().sigmoid(),
@@ -66,6 +67,7 @@ class SAMWrapper(nn.Module):
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
+            import pdb; pdb.set_trace()
             if pred_mask.sum() > 0 and self.use_box:
                 box = mask2box(pred_mask.float().cpu().numpy())
                 box = self.transform.apply_boxes(box, original_image_size)

@@ -217,6 +217,7 @@ class SamPredictor:
             points = (point_coords, point_labels)
         else:
             points = None
+        import pdb; pdb.set_trace()
 
         # Embed prompts
         sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
