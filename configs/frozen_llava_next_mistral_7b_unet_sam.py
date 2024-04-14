@@ -18,6 +18,7 @@ from frozen_llava.datasets.image_processor import CustomLlavaNextImageProcessor
 from frozen_llava.models.llava_sam import FrozenLlavaSAM
 from frozen_llava.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
+from frozen_llava.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
 
@@ -80,7 +81,8 @@ image_processor = dict(
 
 model = dict(
     type=FrozenLlavaSAM,
-    sam_name='vit_l', sam_checkpoint='checkpoints/sam_vit_l_0b3195.pth',
+    sam=dict(type=SAMWrapper,
+             model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),

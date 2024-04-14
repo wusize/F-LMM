@@ -2,17 +2,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from frozen_llava.models.meta_arch import FrozenLlava, compute_mask_IoU
-from frozen_llava.models.segment_modules.sam_wrapper import SAMWrapper
+from xtuner.registry import BUILDER
 
 
 class FrozenLlavaSAM(FrozenLlava):
     def __init__(self,
-                 sam_name, sam_checkpoint,
+                 sam,
                  sam_weight=1.0,
-                 intermediate_weight=0.1,
+                 intermediate_weight=1.0,
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sam = SAMWrapper(model_name=sam_name, checkpoint=sam_checkpoint)
+        self.sam = BUILDER.build(sam)
         self.text_proj = nn.Linear(self.llava.config.text_config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
         self.text_layer_weights = nn.Parameter(
