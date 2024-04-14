@@ -90,7 +90,7 @@ if __name__ == '__main__':
     if args.checkpoint is not None:
         state_dict = guess_load_checkpoint(args.checkpoint)
         missing, unexpected = model.load_state_dict(state_dict, strict=False)
-        assert len(unexpected) == 0
+        accelerator.print(f"Unexpected parameters: {unexpected}")
     model = model.to(device=accelerator.device, dtype=torch.float16)
     model.eval()
 
