@@ -62,10 +62,10 @@ class SAMWrapper(nn.Module):
                 masks=prompt_mask.view(1, 1, 256, 256),
             )
             if self.use_text:
-                sparse_embeddings = sparse_embeddings.to(dense_embeddings)
-            else:
                 sparse_embeddings = torch.cat([sparse_embeddings.to(dense_embeddings),
                                                text_embed[None].to(dense_embeddings)], dim=1)
+            else:
+                sparse_embeddings = sparse_embeddings.to(dense_embeddings)
             low_res_masks, iou_predictions = self.model.mask_decoder(
                 image_embeddings=image_embedding,
                 image_pe=self.model.prompt_encoder.get_dense_pe(),
