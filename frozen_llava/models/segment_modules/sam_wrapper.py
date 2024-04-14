@@ -102,6 +102,7 @@ class SAMWrapper(nn.Module):
                                                   pred_mask.float().view(1, -1))[-1]
                 sam_mask = sam_mask[0, candidate_ious.argmax()]
             else:
+                assert sam_mask.shape[1] == 1
                 sam_mask = sam_mask[0, 0]
             sam_masks.append(sam_mask)
 

@@ -82,7 +82,7 @@ image_processor = dict(
 model = dict(
     type=FrozenLlavaNextSAM,
     sam=dict(type=SAMWrapper,
-             use_text=True, use_mask=True, multimask_output=True,
+             use_text=True, use_mask=True, multimask_output=False,
              model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
