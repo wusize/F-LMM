@@ -98,6 +98,6 @@ class SAMWrapper(nn.Module):
                 sam_mask = candidate_masks[candidate_ious.argmax()]
             else:
                 sam_mask = sam_mask[0, 0]
-            sam_masks.append(sam_mask[0, 0])
+            sam_masks.append(sam_mask)
 
         return torch.stack(sam_masks)
