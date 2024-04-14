@@ -16,8 +16,17 @@ def mask2box(mask, original_image_size):
     return np.array([x0, y0, x1, y1]) * np.array([original_w/w, original_h/h] * 2)
 
 
+def compute_mask_IoU(masks, target):
+    temp = masks * target
+    intersection = temp.sum(dim=-1)
+    union = ((masks + target) - temp).sum(dim=-1)
+    return intersection, union, intersection / (union + 1e-12)
+
+
 class SAMWrapper(nn.Module):
-    def __init__(self, model_name, checkpoint, use_text=True, use_mask=True, use_box=True):
+    def __init__(self, model_name, checkpoint,
+                 use_text=True, use_mask=True, use_box=True,
+                 multimask_output=False):
         super(SAMWrapper, self).__init__()
         self.model = sam_model_registry[model_name](checkpoint=checkpoint)
         self.model.image_encoder.requires_grad_(False)
@@ -25,6 +34,7 @@ class SAMWrapper(nn.Module):
         self.use_text = use_text
         self.use_mask = use_mask
         self.use_box = use_box
+        self.multimask_output = multimask_output
 
     def train(self, mode=True):
         super().train(mode=mode)
@@ -73,9 +83,21 @@ class SAMWrapper(nn.Module):
                 image_pe=self.model.prompt_encoder.get_dense_pe(),
                 sparse_prompt_embeddings=sparse_embeddings,
                 dense_prompt_embeddings=dense_embeddings,
-                multimask_output=False,
+                multimask_output=self.multimask_output,
             )
             sam_mask = self.model.postprocess_masks(low_res_masks, input_size, original_image_size)
+
+            if self.multimask_output:
+                import pdb; pdb.set_trace()
+                candidate_masks = (sam_mask[0] > 0.0).float()
+                pred_mask = F.interpolate(pred_mask[None, None].float(),
+                                          size=candidate_masks.shape[1:], mode='bilinear')
+                pred_mask = (pred_mask > 0.0).float()
+                candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
+                                                  pred_mask.view(1, -1))[-1]
+                sam_mask = candidate_masks[candidate_ious.argmax()]
+            else:
+                sam_mask = sam_mask[0, 0]
             sam_masks.append(sam_mask[0, 0])
 
         return torch.stack(sam_masks)
