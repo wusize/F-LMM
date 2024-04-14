@@ -64,7 +64,7 @@ class SAMWrapper(nn.Module):
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            box = mask2box(pred_mask.detach().float().cpu().numpy(), original_image_size)
+            box = mask2box((pred_mask.detach() > 0.0).float().cpu().numpy(), original_image_size)
             box = self.transform.apply_boxes(box, original_image_size)
             box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
             box_torch = box_torch[None, :]    # 1, 1, 4
