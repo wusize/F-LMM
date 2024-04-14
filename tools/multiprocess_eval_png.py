@@ -4,7 +4,6 @@ import torch.nn.functional as F
 import argparse
 from frozen_llava.datasets.png import PNGDataset
 from tqdm import tqdm
-from functools import partial
 from xtuner.registry import BUILDER
 from mmengine.config import Config
 from xtuner.model.utils import guess_load_checkpoint
@@ -71,6 +70,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
     accelerator = Accelerator()
@@ -113,6 +113,8 @@ if __name__ == '__main__':
     accelerator.wait_for_everyone()
 
     data_ids = list(range(len(png_dataset)))
+    if args.debug:
+        data_ids = data_ids[:1000]
 
     # divide the prompt list onto the available GPUs
     with accelerator.split_between_processes(data_ids) as sub_ids:
