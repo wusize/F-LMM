@@ -167,3 +167,65 @@ class FrozenLlava(BaseModel):
                      'accuracy': accuracy / mask_cnts,
                      'aiou': aiou / mask_cnts}
         return loss_dict
+
+    @torch.no_grad()
+    def predict(self, data_sample):
+        assert data_sample['pixel_values'].shape[0] > 1
+        inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
+                      mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
+                      pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
+                                                                        dtype=self.llava.dtype),
+                      image_sizes=data_sample['image_sizes'][None].to(self.llava.device))
+        attention_mask = torch.ones(inputs['input_ids'].shape, device=self.llava.device,
+                                    dtype=torch.bool)
+        with torch.no_grad():
+            outputs = self.llava(**inputs,
+                                 attention_mask=attention_mask, output_attentions=True)
+        fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
+        mask_ids = outputs['mask_ids']
+        attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
+                      for attn in outputs.attentions]
+        del outputs
+
+        coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
+        coarse_image_feature_h, coarse_image_feature_w = (
+            coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
+
+        attentions_with_coarse = [
+            attn[..., :coarse_image_feature_h * coarse_image_feature_w].view(
+                *attn.shape[:-1], coarse_image_feature_h, coarse_image_feature_w
+            ) for attn in attentions]
+        attentions_with_fine = [
+            attn[..., coarse_image_feature_h * coarse_image_feature_w:].view(
+                *attn.shape[:-1], fine_image_feature_h, fine_image_feature_w + 1
+            )[..., :-1] for attn in attentions]
+        del attentions
+        masks = data_sample['masks'].to(self.llava.device)
+
+        attentions_with_coarse_list = []
+        attentions_with_fine_list = []
+        for mask_id in range(len(masks)):
+            matched = mask_ids[0] == mask_id
+            assert matched.sum() > 0
+
+            mask_attentions_with_coarse = torch.cat(
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions_with_coarse])
+            mask_attentions_with_fine = torch.cat(
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions_with_fine])
+            attentions_with_coarse_list.append(mask_attentions_with_coarse)
+            attentions_with_fine_list.append(mask_attentions_with_fine)
+        # print('==================debug================', flush=True)
+        attentions_with_coarse = torch.stack(attentions_with_coarse_list)
+        attentions_with_fine = torch.stack(attentions_with_fine_list)
+
+        attention_maps = torch.cat([
+            F.interpolate(attentions_with_coarse.float(),
+                          size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
+            F.interpolate(attentions_with_fine.float(),
+                          size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
+        ], dim=1).to(self.llava.dtype)
+        del attentions_with_coarse, attentions_with_fine
+        attention_maps.requires_grad = True
+        pred_masks = self.mask_head(attention_maps)[:, 0]
+
+        return pred_masks
