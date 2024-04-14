@@ -42,6 +42,7 @@ class SAMWrapper(nn.Module):
 
     @torch.no_grad()
     def encode_image(self, image):
+        import pdb; pdb.set_trace()
         image = np.array(image.convert(self.model.image_format))
         input_image = self.transform.apply_image(image)
         input_image_torch = torch.as_tensor(input_image, device=self.model.device)
