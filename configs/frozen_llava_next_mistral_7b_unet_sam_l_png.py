@@ -82,6 +82,7 @@ image_processor = dict(
 model = dict(
     type=FrozenLlavaNextSAM,
     sam=dict(type=SAMWrapper,
+             use_text=True, use_mask=True, multimask_output=True,
              model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
@@ -106,51 +107,19 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
-datasets_list = [
-    dict(type=GCGDataset,
-         ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
-         json_file='data/GranDf_HA_GCG_train.json',
-         local_path='data/GranDf_HA_images/train',
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=GCGDataset,
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
-         json_file='data/OpenPsgGCG_train.json',
-         local_path='data/coco',
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=RefCOCOGForGCGDataset,
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
-         json_file='data/RefCOCOg_GCG_train.json',
-         local_path='data/coco/train2014',
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=FlickrForGCGDataset,
-         ceph_path='BJ17:S3://wusize/flickr/train',
-         json_file='data/flickr_mergedGT_GCG_train.json',
-         local_path='data/flickr/train',
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=PNGDataset,
-         json_file='data/png_coco_train2017.json',
-         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-         panoptic_png_path='data/coco/panoptic_train2017',
-         tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt_template=prompt_template,
-         local_path='data/coco/train2017',
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
-]
 
 train_dataloader = dict(
     batch_size=batch_size,
     num_workers=dataloader_num_workers,
-    dataset=dict(type=concat_datasets,
-                 datasets_list=datasets_list),
+    dataset=dict(type=PNGDataset,
+                 json_file='data/png_coco_train2017.json',
+                 panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+                 panoptic_png_path='data/coco/panoptic_train2017',
+                 tokenizer=tokenizer,
+                 image_processor=image_processor,
+                 prompt_template=prompt_template,
+                 local_path='data/coco/train2017',
+                 ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017'),
     sampler=dict(type=DefaultSampler, shuffle=True),
     collate_fn=dict(type=gcg_collate_fn))
 

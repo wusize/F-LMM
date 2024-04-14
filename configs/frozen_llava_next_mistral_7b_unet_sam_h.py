@@ -82,7 +82,7 @@ image_processor = dict(
 model = dict(
     type=FrozenLlavaNextSAM,
     sam=dict(type=SAMWrapper,
-             use_text=False, use_mask=False, multimask_output=True,
+             use_text=True, use_mask=True, multimask_output=True,
              model_name='vit_h', checkpoint='checkpoints/sam_vit_h_4b8939.pth',),
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
@@ -136,15 +136,15 @@ datasets_list = [
          prompt_template=prompt_template,
          tokenizer=tokenizer,
          image_processor=image_processor),
-    dict(type=PNGDataset,
-         json_file='data/png_coco_train2017.json',
-         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-         panoptic_png_path='data/coco/panoptic_train2017',
-         tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt_template=prompt_template,
-         local_path='data/coco/train2017',
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
+    # dict(type=PNGDataset,
+    #      json_file='data/png_coco_train2017.json',
+    #      panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+    #      panoptic_png_path='data/coco/panoptic_train2017',
+    #      tokenizer=tokenizer,
+    #      image_processor=image_processor,
+    #      prompt_template=prompt_template,
+    #      local_path='data/coco/train2017',
+    #      ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
 ]
 
 train_dataloader = dict(
