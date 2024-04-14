@@ -6,14 +6,12 @@ from segment_anything import sam_model_registry
 from segment_anything.utils.transforms import ResizeLongestSide
 
 
-def mask2box(mask, original_image_size):
-    h, w = mask.shape
-    original_h, original_w = original_image_size
+def mask2box(mask):
     ys, xs = np.where(mask)
     y0, y1 = ys.min(), ys.max()
     x0, x1 = xs.min(), xs.max()
 
-    return np.array([x0, y0, x1, y1]) * np.array([original_w/w, original_h/h] * 2)
+    return np.array([x0, y0, x1, y1])
 
 
 def compute_mask_IoU(masks, target):
@@ -62,11 +60,14 @@ class SAMWrapper(nn.Module):
         image_embedding.requires_grad = True
         prompt_masks = F.interpolate(pred_masks[:, None].float(), size=(256, 256), mode='bilinear').to(pred_masks)
 
+        pred_masks = F.interpolate(pred_masks.detach()[None].float().sigmoid(),
+                                   size=original_image_size, mode='bilinear')[0]
+        pred_masks = (pred_masks > 0.5).to(pred_masks)
+
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            pred_mask_bool = pred_mask.detach() > 0.0
-            if pred_mask_bool.sum() > 0 and self.use_box:
-                box = mask2box(pred_mask_bool.float().cpu().numpy(), original_image_size)
+            if pred_mask.sum() > 0 and self.use_box:
+                box = mask2box(pred_mask.float().cpu().numpy())
                 box = self.transform.apply_boxes(box, original_image_size)
                 box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
                 box_torch = box_torch[None, :]    # 1, 1, 4
@@ -94,12 +95,9 @@ class SAMWrapper(nn.Module):
             if self.multimask_output:
                 # import pdb; pdb.set_trace()
                 candidate_masks = (sam_mask[0] > 0.0).float()
-                pred_mask = F.interpolate(pred_mask[None, None].float(),
-                                          size=candidate_masks.shape[1:], mode='bilinear')
-                pred_mask = (pred_mask > 0.0).float()
                 candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
-                                                  pred_mask.view(1, -1))[-1]
-                sam_mask = sam_mask[0][candidate_ious.argmax()]
+                                                  pred_mask.float().view(1, -1))[-1]
+                sam_mask = sam_mask[0, candidate_ious.argmax()]
             else:
                 sam_mask = sam_mask[0, 0]
             sam_masks.append(sam_mask)

@@ -211,7 +211,7 @@ if __name__ == '__main__':
                 sam_predictor.set_image(image)
             pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
                                        size=masks.shape[-2:], mode='bilinear')[0].cpu()
-            pred_masks = (pred_masks > 0.5).float()
+            pred_masks = (pred_masks > 0.5).float()    # in original shape
 
             if sam_predictor is not None:
                 # image = np.array(data_sample['image'].convert('RGB'))
