@@ -23,6 +23,10 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
 
+    @property
+    def dtype(self):
+        return self.text_layer_weights.dtype
+
     def compute_loss(self, data):
         mask_cnts = 0
         loss_dice = 0
@@ -216,7 +220,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             matched_hidden_states = torch.stack([hs[0, matched] for hs in hidden_states])
             matched_hidden_states *= text_layer_weights.view(-1, 1, 1)
             # matched_seq_len, hidden_size
-            text_embeds.append(self.text_proj(matched_hidden_states.sum(0)))
+            text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.dtype)))
 
         del hidden_states
 
@@ -229,7 +233,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
             F.interpolate(attentions_with_fine.float(),
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
-        ], dim=1).to(self.llava.dtype)
+        ], dim=1).to(self.dtype)
         del attentions_with_coarse, attentions_with_fine
         pred_masks = self.mask_head(attention_maps)[:, 0]
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
