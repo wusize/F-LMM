@@ -17,12 +17,13 @@ def mask2box(mask, original_image_size):
 
 
 class SAMWrapper(nn.Module):
-    def __init__(self, model_name, checkpoint, use_text=True):
+    def __init__(self, model_name, checkpoint, use_text=True, use_mask=True):
         super(SAMWrapper, self).__init__()
         self.model = sam_model_registry[model_name](checkpoint=checkpoint)
         self.model.image_encoder.requires_grad_(False)
         self.transform = ResizeLongestSide(self.model.image_encoder.img_size)
         self.use_text = use_text
+        self.use_mask = use_mask
 
     def train(self, mode=True):
         super().train(mode=mode)
@@ -59,7 +60,7 @@ class SAMWrapper(nn.Module):
             sparse_embeddings, dense_embeddings = self.model.prompt_encoder(
                 points=None,
                 boxes=box_torch,
-                masks=prompt_mask.view(1, 1, 256, 256),
+                masks=prompt_mask.view(1, 1, 256, 256) if self.use_mask else None,
             )
             if self.use_text:
                 sparse_embeddings = torch.cat([sparse_embeddings.to(dense_embeddings),
