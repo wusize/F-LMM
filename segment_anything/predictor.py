@@ -45,7 +45,7 @@ class SamPredictor:
             image in HWC uint8 format, with pixel values in [0, 255].
           image_format (str): The color format of the image, in ['RGB', 'BGR'].
         """
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         assert image_format in [
             "RGB",
             "BGR",
@@ -218,7 +218,7 @@ class SamPredictor:
             points = (point_coords, point_labels)
         else:
             points = None
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
         # Embed prompts
         sparse_embeddings, dense_embeddings = self.model.prompt_encoder(

@@ -42,7 +42,7 @@ class SAMWrapper(nn.Module):
 
     @torch.no_grad()
     def encode_image(self, image):
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         image = np.array(image.convert(self.model.image_format))
         input_image = self.transform.apply_image(image)
         input_image_torch = torch.as_tensor(input_image, device=self.model.device)
@@ -68,7 +68,7 @@ class SAMWrapper(nn.Module):
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
             if pred_mask.sum() > 0 and self.use_box:
                 box = mask2box(pred_mask.float().cpu().numpy())
                 box = self.transform.apply_boxes(box, original_image_size)
