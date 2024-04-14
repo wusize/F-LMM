@@ -91,7 +91,7 @@ if __name__ == '__main__':
         state_dict = guess_load_checkpoint(args.checkpoint)
         missing, unexpected = model.load_state_dict(state_dict, strict=False)
         accelerator.print(f"Unexpected parameters: {unexpected}")
-    model = model.to(device=accelerator.device, dtype=torch.float16)
+    model = model.to(device=accelerator.device)
     model.eval()
 
     png_dataset = PNGDataset(json_file='data/png_coco_val2017.json',

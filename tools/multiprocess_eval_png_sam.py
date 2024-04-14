@@ -106,7 +106,8 @@ if __name__ == '__main__':
     mask_head = BUILDER.build(mask_head).to(dtype=llm.dtype, device=llm.device)
     if args.sam_model is not None:
         from segment_anything import SamPredictor, sam_model_registry
-        sam = sam_model_registry[args.sam_model](checkpoint=args.sam_checkpoint).to(device=llm.device)
+        sam = sam_model_registry[args.sam_model](checkpoint=args.sam_checkpoint).to(dtype=llm.dtype,
+                                                                                    device=llm.device)
         sam.eval()
         sam_predictor = SamPredictor(sam)
     else:
