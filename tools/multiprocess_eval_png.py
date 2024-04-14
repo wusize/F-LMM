@@ -114,7 +114,7 @@ if __name__ == '__main__':
 
     data_ids = list(range(len(png_dataset)))
     if args.debug:
-        data_ids = data_ids[:1000]
+        data_ids = data_ids[:100]
 
     # divide the prompt list onto the available GPUs
     with accelerator.split_between_processes(data_ids) as sub_ids:
