@@ -99,7 +99,7 @@ class SAMWrapper(nn.Module):
                 pred_mask = (pred_mask > 0.0).float()
                 candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
                                                   pred_mask.view(1, -1))[-1]
-                sam_mask = candidate_masks[candidate_ious.argmax()]
+                sam_mask = sam_mask[0][candidate_ious.argmax()]
             else:
                 sam_mask = sam_mask[0, 0]
             sam_masks.append(sam_mask)
