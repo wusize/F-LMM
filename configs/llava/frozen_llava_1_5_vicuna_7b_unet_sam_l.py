@@ -48,7 +48,7 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 #######################################################################
 # Model
 prompt_template = PROMPT_TEMPLATE.vicuna
-llava_name = 'liuhaotian/llava-v1.5-7b'
+llava_name = 'llava-hf/llava-1.5-7b-hf'
 unet = dict(type=UNetHead,
             upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
             in_channels=2048,

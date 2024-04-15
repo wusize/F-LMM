@@ -175,7 +175,7 @@ if __name__ == '__main__':
                          #     pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
                          tokenizer=dict(
                              type=AutoTokenizer.from_pretrained,
-                             pretrained_model_name_or_path='liuhaotian/llava-v1.5-7b'),
+                             pretrained_model_name_or_path='llava-hf/llava-1.5-7b-hf'),
                          # image_processor=dict(
                          #     type=CustomLlavaNextImageProcessor.from_pretrained,
                          #     pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
