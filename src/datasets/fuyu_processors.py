@@ -215,7 +215,6 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
         }
         return FuyuBatchFeature(data=data, tensor_type=return_tensors)
 
-
     def resize(
         self,
         image: np.ndarray,

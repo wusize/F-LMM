@@ -61,11 +61,10 @@ class CustomLlavaImageProcessor(CLIPImageProcessor):
             default_to_square = False
             # customization: force the largest edge to size
             h, w = get_image_size(image, channel_dim=input_data_format)
-            rescale = size / max(h, w)
-            target_h, target_w = int(h * rescale), int(w * rescale)
-            assert max(target_h, target_w) == size
-            size = (target_h, target_w)
-
+            if h > w:
+                size = (size, int(w * size / h))
+            else:
+                size = (int(h * size / w), size)
         elif "height" in size and "width" in size:
             size = (size["height"], size["width"])
         else:
