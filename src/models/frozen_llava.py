@@ -232,7 +232,7 @@ class FrozenLlavaSAM(FrozenLlava):
             matched_hidden_states = torch.stack([hs[0, matched] for hs in hidden_states])
             matched_hidden_states *= text_layer_weights.view(-1, 1, 1)
             # matched_seq_len, hidden_size
-            text_embeds.append(self.text_proj(matched_hidden_states.sum(0)))
+            text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.dtype)))
 
         del attentions, hidden_states
         mask_attentions = torch.stack(mask_attentions)
