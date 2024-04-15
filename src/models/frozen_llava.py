@@ -104,7 +104,7 @@ class FrozenLlava(BaseModel):
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
 
         del attentions
-        mask_attentions = torch.stack(mask_attentions)
+        mask_attentions = torch.stack(mask_attentions).to(self.dtype)
         if self.training:
             mask_attentions.requires_grad = True
         pred_masks = self.mask_head(mask_attentions)[:, 0]

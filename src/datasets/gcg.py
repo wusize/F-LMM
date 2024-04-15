@@ -166,7 +166,7 @@ class GCGDataset(Dataset):
                     pixel_values=pixel_values,
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
-                    image_sizes=torch.tensor(image_data['image_sizes'][0]),
+                    image_sizes=torch.tensor(image_data['image_sizes'][0]),   # only used for llava-next
                     image=image,
                     meta_data=meta_data)
 

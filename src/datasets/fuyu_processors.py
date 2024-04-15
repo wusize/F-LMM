@@ -206,12 +206,17 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
                 [to_channel_dimension_format(image, data_format, input_data_format) for image in images]
                 for images in batch_images
             ]
-
+        meta_datas = [
+            dict(image_shape=dict(height=image_h[0], width=image_w[0]),
+                 padded_shape=size,
+                 padding=dict(before_height=0, after_height=size['height'] - image_h[0],
+                              before_width=0, after_width=size['width'] - image_w[0]))
+            for image_h, image_w in zip(image_unpadded_heights, image_unpadded_widths)
+        ]
         data = {
-            "images": batch_images,
-            "image_unpadded_heights": image_unpadded_heights,
-            "image_unpadded_widths": image_unpadded_widths,
-            "image_scale_factors": image_scale_factors,
+            "pixel_values": [img[0] for img in batch_images],
+            "image_sizes": original_image_sizes,
+            "meta_datas": meta_datas,
         }
         return FuyuBatchFeature(data=data, tensor_type=return_tensors)
 
@@ -253,8 +258,8 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
         image_height, image_width = get_image_size(image, input_data_format)
         target_height, target_width = size["height"], size["width"]
 
-        if image_width <= target_width and image_height <= target_height:
-            return image
+        # if image_width <= target_width and image_height <= target_height:
+        #     return image
 
         height_scale_factor = target_height / image_height
         width_scale_factor = target_width / image_width
