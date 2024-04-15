@@ -100,7 +100,7 @@ class UNetHead(UNet):
         h, w = x.shape[-2:]
         if self.upsample_input is not None:
             scale_factor = max(1.0, self.upsample_input / max(h, w))
-            x = F.interpolate(x, scale_factor=scale_factor, mode='bilinear')
+            x = F.interpolate(x.float(), scale_factor=scale_factor, mode='bilinear').to(x)
             h, w = x.shape[-2:]   # upsample the low-res input to get better results
 
         dividend = 2**(self.num_stages - 1)
