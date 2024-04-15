@@ -152,6 +152,8 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             elif 'loss' in k:
                 loss_dict[k] *= self.intermediate_weight
         print(f"Finish. Device: {self.device}. Loss dict: {loss_dict}", flush=True)
+        if aiou == 0:
+            print(f"data samples {data}, device: {self.device}", flush=True)
 
         return loss_dict
 
