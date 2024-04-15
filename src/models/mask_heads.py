@@ -2,11 +2,11 @@ import math
 import types
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from mmcv.cnn import ConvModule
 from mmseg.models import UNet
 from mmseg.models.utils.wrappers import Upsample, resize
 from mmengine.logging import print_log
-
 
 class FCNHead(nn.Module):
     """Fully Convolution Networks for Semantic Segmentation.
@@ -84,7 +84,7 @@ def upsample_forward_func(self, x):
 
 
 class UNetHead(UNet):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, upsample_input=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conv_seg = nn.Conv2d(self.base_channels, 1, kernel_size=1)
 
@@ -94,9 +94,15 @@ class UNetHead(UNet):
                 module.forward = types.MethodType(upsample_forward_func, module)
 
         self.init_weights()
+        self.upsample_input = upsample_input
 
     def forward(self, x):
         h, w = x.shape[-2:]
+        if self.upsample_input is not None:
+            scale_factor = max(1.0, self.upsample_input / max(h, w))
+            x = F.interpolate(x, scale_factor=scale_factor, mode='bilinear')
+            h, w = x.shape[-2:]   # upsample the low-res input to get better results
+
         dividend = 2**(self.num_stages - 1)
         padded_h = math.ceil(h / dividend) * dividend
         padded_w = math.ceil(w / dividend) * dividend

@@ -9,16 +9,14 @@ from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
 from mmengine.dataset import DefaultSampler
-from frozen_llava.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
-                                       concat_datasets, gcg_collate_fn)
-from frozen_llava.datasets.png import PNGDataset
-from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
-from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
-# from frozen_llava.models.meta_arch import FrozenLlava
-from frozen_llava.models.llava_sam import FrozenLlavaNextSAM
-from frozen_llava.models.mask_heads import UNetHead
+from src.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
+                              concat_datasets, gcg_collate_fn)
+from src.datasets.png import PNGDataset
+from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
+from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+from src.models.frozen_llava_next import FrozenLlavaNext
+from src.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
-from frozen_llava.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
 
@@ -80,10 +78,7 @@ image_processor = dict(
     pretrained_model_name_or_path=llava_name)
 
 model = dict(
-    type=FrozenLlavaNextSAM,
-    sam=dict(type=SAMWrapper,
-             use_text=True, use_mask=True, multimask_output=True,
-             model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
+    type=FrozenLlavaNext,
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),
@@ -107,19 +102,51 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
+datasets_list = [
+    dict(type=GCGDataset,
+         ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
+         json_file='data/GranDf_HA_GCG_train.json',
+         local_path='data/GranDf_HA_images/train',
+         prompt_template=prompt_template,
+         tokenizer=tokenizer,
+         image_processor=image_processor),
+    dict(type=GCGDataset,
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
+         json_file='data/OpenPsgGCG_train.json',
+         local_path='data/coco',
+         prompt_template=prompt_template,
+         tokenizer=tokenizer,
+         image_processor=image_processor),
+    dict(type=RefCOCOGForGCGDataset,
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
+         json_file='data/RefCOCOg_GCG_train.json',
+         local_path='data/coco/train2014',
+         prompt_template=prompt_template,
+         tokenizer=tokenizer,
+         image_processor=image_processor),
+    dict(type=FlickrForGCGDataset,
+         ceph_path='BJ17:S3://wusize/flickr/train',
+         json_file='data/flickr_mergedGT_GCG_train.json',
+         local_path='data/flickr/train',
+         prompt_template=prompt_template,
+         tokenizer=tokenizer,
+         image_processor=image_processor),
+    dict(type=PNGDataset,
+         json_file='data/png_coco_train2017.json',
+         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+         panoptic_png_path='data/coco/panoptic_train2017',
+         tokenizer=tokenizer,
+         image_processor=image_processor,
+         prompt_template=prompt_template,
+         local_path='data/coco/train2017',
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
+]
 
 train_dataloader = dict(
     batch_size=batch_size,
     num_workers=dataloader_num_workers,
-    dataset=dict(type=PNGDataset,
-                 json_file='data/png_coco_train2017.json',
-                 panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-                 panoptic_png_path='data/coco/panoptic_train2017',
-                 tokenizer=tokenizer,
-                 image_processor=image_processor,
-                 prompt_template=prompt_template,
-                 local_path='data/coco/train2017',
-                 ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017'),
+    dataset=dict(type=concat_datasets,
+                 datasets_list=datasets_list),
     sampler=dict(type=DefaultSampler, shuffle=True),
     collate_fn=dict(type=gcg_collate_fn))
 

@@ -3,12 +3,12 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 import argparse
-from frozen_llava.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
+from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
 from xtuner.utils.templates import PROMPT_TEMPLATE
 from transformers import AutoTokenizer
-from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
-from frozen_llava.datasets.gcg import GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset
-from frozen_llava.datasets.png import PNGDataset
+from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+from src.datasets.gcg import GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset
+from src.datasets.png import PNGDataset
 from tqdm import tqdm
 
 

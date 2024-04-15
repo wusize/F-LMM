@@ -368,11 +368,12 @@ class CustomLlavaNextForConditionalGeneration(LlavaNextForConditionalGeneration)
                 shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1).to(shift_logits.device)
             )
 
+        assert return_dict, "Use dict in our implementation"
+
         if not return_dict:
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
-        assert return_dict, "Use dict in our implementation"
 
         return LlavaNextCausalLMOutputWithPast(
             loss=loss,

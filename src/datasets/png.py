@@ -132,7 +132,6 @@ class PNGDataset(Dataset):
         meta_data = image_data['meta_datas'][0]
 
         masks = torch.from_numpy(np.stack(masks))
-        resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
 
         h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
         gt_masks = masks.clone()
@@ -149,13 +148,13 @@ class PNGDataset(Dataset):
         return dict(input_ids=input_ids,
                     mask_ids=mask_ids,
                     pixel_values=pixel_values,
-                    resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     gt_masks=gt_masks,
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
                     mask_infos=mask_infos,
-                    image=image)
+                    image=image,
+                    meta_data=meta_data)
 
 
 if __name__ == '__main__':
@@ -163,7 +162,8 @@ if __name__ == '__main__':
     prompt_template = PROMPT_TEMPLATE.mistral
     from transformers import AutoTokenizer
     from transformers import AutoTokenizer
-    from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+    from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+    from src.datasets.llava_image_processor import CustomLlavaImageProcessor
     from tqdm import tqdm
     dataset = PNGDataset(json_file='data/png_coco_val2017.json',
                          panoptic_json_file='data/coco/annotations/panoptic_val2017.json',
@@ -171,9 +171,12 @@ if __name__ == '__main__':
                          tokenizer=dict(
                              type=AutoTokenizer.from_pretrained,
                              pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                         # image_processor=dict(
+                         #     type=CustomLlavaNextImageProcessor.from_pretrained,
+                         #     pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
                          image_processor=dict(
-                             type=CustomLlavaNextImageProcessor.from_pretrained,
-                             pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                             type=CustomLlavaImageProcessor.from_pretrained,
+                             pretrained_model_name_or_path='openai/clip-vit-large-patch14-336'),
                          prompt_template=prompt_template,
                          local_path='data/coco/val2017'
                          )

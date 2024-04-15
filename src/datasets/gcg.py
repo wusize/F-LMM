@@ -149,8 +149,6 @@ class GCGDataset(Dataset):
         meta_data = image_data['meta_datas'][0]
 
         masks = torch.from_numpy(np.stack(masks))
-        resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
-
         h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
         masks = F.interpolate(masks[None], size=(h, w))[0]
 
@@ -165,11 +163,11 @@ class GCGDataset(Dataset):
         return dict(input_ids=final_input_ids,
                     mask_ids=mask_ids,
                     pixel_values=pixel_values,
-                    resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
-                    image=image)
+                    image=image,
+                    meta_data=meta_data)
 
 
 class RefCOCOGForGCGDataset(GCGDataset):
@@ -240,8 +238,6 @@ class RefCOCOGForGCGDataset(GCGDataset):
         meta_data = image_data['meta_datas'][0]
 
         masks = torch.from_numpy(np.stack(masks))
-        resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
-
         h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
         masks = F.interpolate(masks[None], size=(h, w))[0]
 
@@ -256,11 +252,11 @@ class RefCOCOGForGCGDataset(GCGDataset):
         return dict(input_ids=final_input_ids,
                     mask_ids=mask_ids,
                     pixel_values=pixel_values,
-                    resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
-                    image=image)
+                    image=image,
+                    meta_data=meta_data)
 
 
 class FlickrForGCGDataset(GCGDataset):
@@ -352,7 +348,6 @@ class FlickrForGCGDataset(GCGDataset):
         meta_data = image_data['meta_datas'][0]
 
         masks = torch.from_numpy(np.stack(masks))
-        resized_masks = F.interpolate(masks[None], size=pixel_values.shape[2:])[0]
 
         h, w = meta_data['image_shape']['height'], meta_data['image_shape']['width']
         masks = F.interpolate(masks[None], size=(h, w))[0]
@@ -368,11 +363,11 @@ class FlickrForGCGDataset(GCGDataset):
         return dict(input_ids=final_input_ids,
                     mask_ids=mask_ids,
                     pixel_values=pixel_values,
-                    resized_masks=resized_masks,   # shape is not kept
                     padded_masks=padded_masks,
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
-                    image=image)
+                    image=image,
+                    meta_data=meta_data)
 
 
 # TODO: use MUSE dataset
@@ -386,7 +381,7 @@ if __name__ == '__main__':
     dataset_list = []
     from xtuner.utils.templates import PROMPT_TEMPLATE
     from transformers import AutoTokenizer
-    from frozen_llava.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+    from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
     prompt_template = PROMPT_TEMPLATE.mistral
     ha_dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
                             local_path='data/GranDf_HA_images/train',

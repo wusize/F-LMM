@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import argparse
-from frozen_llava.datasets.png import PNGDataset
+from src.datasets.png import PNGDataset
 from tqdm import tqdm
 from xtuner.registry import BUILDER
 from mmengine.config import Config
