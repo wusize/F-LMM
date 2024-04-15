@@ -59,7 +59,7 @@ class SAMWrapper(nn.Module):
         import pdb; pdb.set_trace()
         pad_value = min(-1.0, masks.min().item())
         masks = F.interpolate(masks[:, None].float(), size=input_size, mode='bilinear').to(masks)
-        _, h, w = masks.shape
+        h, w = masks.shape[-2:]
         masks = F.pad(masks, (0, self.model.image_encoder.img_size - w,
                               0, self.model.image_encoder.img_size - h), value=pad_value)
         prompt_masks = F.interpolate(masks.float(), size=(256, 256), mode='bilinear').to(masks)
