@@ -42,7 +42,6 @@ class SAMWrapper(nn.Module):
 
     @torch.no_grad()
     def encode_image(self, image):
-        # import pdb; pdb.set_trace()
         image = np.array(image.convert(self.model.image_format))
         input_image = self.transform.apply_image(image)
         input_image_torch = torch.as_tensor(input_image, device=self.model.device)
@@ -56,7 +55,6 @@ class SAMWrapper(nn.Module):
         return features, original_image_size, input_size
 
     def generate_prompt_masks(self, masks, input_size):
-        import pdb; pdb.set_trace()
         pad_value = min(-1.0, masks.min().item())
         masks = F.interpolate(masks[:, None].float(), size=input_size, mode='bilinear').to(masks)
         h, w = masks.shape[-2:]
@@ -72,7 +70,6 @@ class SAMWrapper(nn.Module):
         image_embedding, original_image_size, input_size = self.encode_image(image)
         if self.training:
             image_embedding.requires_grad = True
-        import pdb; pdb.set_trace()
         prompt_masks = self.generate_prompt_masks(pred_masks, input_size)
 
         pred_masks = F.interpolate(pred_masks.detach()[None].float().sigmoid(),
@@ -81,7 +78,6 @@ class SAMWrapper(nn.Module):
 
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
-            # import pdb; pdb.set_trace()
             if self.use_box:
                 if pred_mask.sum() > 0:
                     box = mask2box(pred_mask.float().cpu().numpy())
@@ -113,7 +109,6 @@ class SAMWrapper(nn.Module):
             sam_mask = self.model.postprocess_masks(low_res_masks, input_size, original_image_size)
 
             if self.multimask_output:
-                # import pdb; pdb.set_trace()
                 candidate_masks = (sam_mask[0] > 0.0).float()
                 candidate_ious = compute_mask_IoU(candidate_masks.view(3, -1),
                                                   pred_mask.float().view(1, -1))[-1]
