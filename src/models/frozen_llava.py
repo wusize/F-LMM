@@ -195,7 +195,6 @@ class FrozenLlavaSAM(FrozenLlava):
         return torch.softmax(self.text_layer_weights, dim=0)
 
     def _forward(self, data_sample):
-        import pdb; pdb.set_trace()
         text_layer_weights = self.get_text_layer_weights()
         inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
                       mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
@@ -248,7 +247,7 @@ class FrozenLlavaSAM(FrozenLlava):
 
         mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
-
+        import pdb; pdb.set_trace()
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
