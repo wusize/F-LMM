@@ -130,21 +130,21 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             accuracy += accuracy_ * mask_cnt
             aiou += aiou_ * mask_cnt
 
-            sam_loss_dice_, sam_loss_mask_, sam_accuracy_, sam_aiou_ = self._compute(sam_pred_masks, sam_gt_masks)
-            sam_loss_dice += sam_loss_dice_ * mask_cnt
-            sam_loss_mask += sam_loss_mask_ * mask_cnt
-            sam_accuracy += sam_accuracy_ * mask_cnt
-            sam_aiou += sam_aiou_ * mask_cnt
+            # sam_loss_dice_, sam_loss_mask_, sam_accuracy_, sam_aiou_ = self._compute(sam_pred_masks, sam_gt_masks)
+            # sam_loss_dice += sam_loss_dice_ * mask_cnt
+            # sam_loss_mask += sam_loss_mask_ * mask_cnt
+            # sam_accuracy += sam_accuracy_ * mask_cnt
+            # sam_aiou += sam_aiou_ * mask_cnt
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
                      'loss_dice': loss_dice / mask_cnts,
                      'accuracy': accuracy / mask_cnts,
                      'aiou': aiou / mask_cnts,
-                     'sam_loss_mask': sam_loss_mask / mask_cnts,
-                     'sam_loss_dice': sam_loss_dice / mask_cnts,
-                     'sam_accuracy': sam_accuracy / mask_cnts,
-                     'sam_aiou': sam_aiou / mask_cnts,
+                     # 'sam_loss_mask': sam_loss_mask / mask_cnts,
+                     # 'sam_loss_dice': sam_loss_dice / mask_cnts,
+                     # 'sam_accuracy': sam_accuracy / mask_cnts,
+                     # 'sam_aiou': sam_aiou / mask_cnts,
                      }
         for k, v in loss_dict.items():
             if 'sam_loss' in k:
@@ -152,8 +152,8 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             elif 'loss' in k:
                 loss_dict[k] *= self.intermediate_weight
         print(f"Finish. Device: {self.device}. Loss dict: {loss_dict}", flush=True)
-        if aiou == 0:
-            print(f"data samples {data}, device: {self.device}. {gt_masks.mean()}", flush=True)
+        # if aiou == 0:
+        #     print(f"data samples {data}, device: {self.device}. {gt_masks.mean()}", flush=True)
 
         return loss_dict
 
