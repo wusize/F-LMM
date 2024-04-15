@@ -238,7 +238,7 @@ class FrozenLlavaSAM(FrozenLlava):
         mask_attentions = torch.stack(mask_attentions)
         if self.training:
             mask_attentions.requires_grad = True
-        pred_masks = self.mask_head(mask_attentions)[:, 0]
+        pred_masks = self.mask_head(mask_attentions)[:, 0].to(self.dtype)
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
 
