@@ -25,7 +25,7 @@ class FrozenLlava(BaseModel):
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
         in_channels = (self.llava.config.text_config.num_attention_heads *
-                       self.llava.config.text_config.num_hidden_layers*2)
+                       self.llava.config.text_config.num_hidden_layers)
         mask_head.update(
             in_channels=in_channels)
         self.mask_head = BUILDER.build(mask_head)

@@ -12,12 +12,15 @@ from transformers.image_utils import (
 )
 from transformers.utils import TensorType
 from transformers.models.fuyu.image_processing_fuyu import make_list_of_list_of_images, logger, FuyuBatchFeature
+from transformers.image_transforms import resize
+import numpy as np
 
 
 fuyu_template = dict(
     SYSTEM='',
     INSTRUCTION='{input}\n\x04',
-    SEP='\n'),
+    SEP='\n')
+
 
 class CustomFuyuTokenizer(LlamaTokenizerFast):
     @classmethod
@@ -213,9 +216,69 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
         return FuyuBatchFeature(data=data, tensor_type=return_tensors)
 
 
+    def resize(
+        self,
+        image: np.ndarray,
+        size: Dict[str, int],
+        resample: PILImageResampling = PILImageResampling.BILINEAR,
+        data_format: Optional[Union[str, ChannelDimension]] = None,
+        input_data_format: Optional[Union[str, ChannelDimension]] = None,
+        **kwargs,
+    ) -> np.ndarray:
+        """
+        Resize an image to `(size["height"], size["width"])`.
+
+        Args:
+            image (`np.ndarray`):
+                Image to resize.
+            size (`Dict[str, int]`):
+                Dictionary in the format `{"height": int, "width": int}` specifying the size of the output image.
+            resample (`PILImageResampling`, *optional*, defaults to `PILImageResampling.BILINEAR`):
+                `PILImageResampling` filter to use when resizing the image e.g. `PILImageResampling.BILINEAR`.
+            data_format (`ChannelDimension` or `str`, *optional*):
+                The channel dimension format for the output image. If unset, the channel dimension format of the input
+                image is used. Can be one of:
+                - `"channels_first"` or `ChannelDimension.FIRST`: image in (num_channels, height, width) format.
+                - `"channels_last"` or `ChannelDimension.LAST`: image in (height, width, num_channels) format.
+                - `"none"` or `ChannelDimension.NONE`: image in (height, width) format.
+            input_data_format (`ChannelDimension` or `str`, *optional*):
+                The channel dimension format for the input image. If unset, the channel dimension format is inferred
+                from the input image. Can be one of:
+                - `"channels_first"` or `ChannelDimension.FIRST`: image in (num_channels, height, width) format.
+                - `"channels_last"` or `ChannelDimension.LAST`: image in (height, width, num_channels) format.
+                - `"none"` or `ChannelDimension.NONE`: image in (height, width) format.
+
+        Returns:
+            `np.ndarray`: The resized image.
+        """
+        image_height, image_width = get_image_size(image, input_data_format)
+        target_height, target_width = size["height"], size["width"]
+
+        if image_width <= target_width and image_height <= target_height:
+            return image
+
+        height_scale_factor = target_height / image_height
+        width_scale_factor = target_width / image_width
+        optimal_scale_factor = min(height_scale_factor, width_scale_factor)
+
+        new_height = int(image_height * optimal_scale_factor)
+        new_width = int(image_width * optimal_scale_factor)
+
+        scaled_image = resize(
+            image=image,
+            size=(new_height, new_width),
+            resample=resample,
+            data_format=data_format,
+            input_data_format=input_data_format,
+            **kwargs,
+        )
+        return scaled_image
+
+
 if __name__ == "__main__":
     tokenizer = CustomFuyuTokenizer.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b')
-    image_processor = CustomFuyuImageProcessor.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b')
+    image_processor = CustomFuyuImageProcessor.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b',
+                                                               size={'height': 960, 'width': 960})
     encoded = tokenizer.encode('<image>what is in this image?\n\x04')
     for enc in encoded:
         print(tokenizer.decode(enc), flush=True)
