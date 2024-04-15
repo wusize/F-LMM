@@ -51,6 +51,7 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 prompt_template = PROMPT_TEMPLATE.mistral
 llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
 unet = dict(type=UNetHead,
+            upsample_input=256,
             in_channels=2048,
             base_channels=64,
             num_stages=4,
