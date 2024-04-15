@@ -146,6 +146,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                 loss_dict[k] *= self.sam_weight
             elif 'loss' in k:
                 loss_dict[k] *= self.intermediate_weight
+        print(f"Finish. Device: {loss_mask.device}", flush=True)
 
         return loss_dict
 
