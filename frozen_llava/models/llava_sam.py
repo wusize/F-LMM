@@ -119,9 +119,9 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
                                      size=(fine_image_feature_h, fine_image_feature_w))[0].to(self.llava.dtype)
             assert pred_masks.shape == gt_masks.shape
-            sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
-            sam_gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
-                                         size=sam_pred_masks.shape[-2:])[0].to(self.llava.dtype)
+            # sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
+            # sam_gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
+            #                              size=sam_pred_masks.shape[-2:])[0].to(self.llava.dtype)
             mask_cnts += mask_cnt
 
             loss_dice_, loss_mask_, accuracy_, aiou_ = self._compute(pred_masks, gt_masks)
