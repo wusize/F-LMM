@@ -235,10 +235,10 @@ class FrozenLlavaSAM(FrozenLlava):
             text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.dtype)))
 
         del attentions, hidden_states
-        mask_attentions = torch.stack(mask_attentions)
+        mask_attentions = torch.stack(mask_attentions).to(self.dtype)
         if self.training:
             mask_attentions.requires_grad = True
-        pred_masks = self.mask_head(mask_attentions)[:, 0].to(self.dtype)
+        pred_masks = self.mask_head(mask_attentions)[:, 0]
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
 
