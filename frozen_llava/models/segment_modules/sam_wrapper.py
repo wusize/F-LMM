@@ -11,7 +11,7 @@ def mask2box(mask):
     y0, y1 = ys.min(), ys.max()
     x0, x1 = xs.min(), xs.max()
 
-    return np.array([x0, y0, x1, y1])
+    return np.array([x0, y0, x1+1, y1+1])    # avoid x0==x1
 
 
 def compute_mask_IoU(masks, target):
@@ -69,8 +69,12 @@ class SAMWrapper(nn.Module):
         sam_masks = []
         for prompt_mask, pred_mask, text_embed in zip(prompt_masks, pred_masks, text_embeds):
             # import pdb; pdb.set_trace()
-            if pred_mask.sum() > 0 and self.use_box:
-                box = mask2box(pred_mask.float().cpu().numpy())
+            if self.use_box:
+                if pred_mask.sum() > 0:
+                    box = mask2box(pred_mask.float().cpu().numpy())
+                else:
+                    h, w = original_image_size
+                    box = np.array([0.0, 0.0, w, h])
                 box = self.transform.apply_boxes(box, original_image_size)
                 box_torch = torch.as_tensor(box, dtype=pred_mask.dtype, device=self.model.device)
                 box_torch = box_torch[None, :]    # 1, 1, 4
