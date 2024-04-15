@@ -27,6 +27,10 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
     def dtype(self):
         return self.text_layer_weights.dtype
 
+    @property
+    def device(self):
+        return self.text_layer_weights.device
+
     def compute_loss(self, data):
         mask_cnts = 0
         loss_dice = 0
@@ -38,6 +42,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         sam_accuracy = 0
         sam_aiou = 0
         text_layer_weights = self.get_text_layer_weights()
+        print(f"Start: Device: {self.device}", flush=True)
         for data_sample in data:
             assert data_sample['pixel_values'].shape[0] > 1
             inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
@@ -146,7 +151,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                 loss_dict[k] *= self.sam_weight
             elif 'loss' in k:
                 loss_dict[k] *= self.intermediate_weight
-        print(f"Finish. Device: {loss_mask.device}", flush=True)
+        print(f"Finish. Device: {self.device}. Loss dict: {loss_dict}", flush=True)
 
         return loss_dict
 
