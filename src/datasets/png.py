@@ -27,7 +27,8 @@ class PNGDataset(Dataset):
                  panoptic_json_file,
                  panoptic_png_path,
                  image_processor=None, tokenizer=None,
-                 ceph_path=None, local_path=None, prompt_template=None):
+                 ceph_path=None, local_path=None, prompt_template=None,
+                 prompt='<image>\nWhat is shown in this image?'):
         super().__init__()
         with open(json_file, 'r') as f:
             self.data = json.load(f)
@@ -47,7 +48,7 @@ class PNGDataset(Dataset):
         else:
             self.image_processor = image_processor
         self.prompt = self.tokenizer.encode(
-            prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+            prompt_template['INSTRUCTION'].format(input=prompt),
             add_special_tokens=True)
         self.prompt_template = prompt_template
 
@@ -164,7 +165,7 @@ if __name__ == '__main__':
     from transformers import AutoTokenizer
     from transformers import AutoTokenizer
     # from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
-    from src.datasets.llava_image_processor import CustomLlavaImageProcessor
+    from src.datasets.llava_processors import CustomLlavaImageProcessor
     from tqdm import tqdm
     dataset = PNGDataset(json_file='data/png_coco_val2017.json',
                          panoptic_json_file='data/coco/annotations/panoptic_val2017.json',

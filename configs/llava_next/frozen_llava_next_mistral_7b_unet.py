@@ -13,7 +13,7 @@ from src.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDat
                               concat_datasets, gcg_collate_fn)
 from src.datasets.png import PNGDataset
 from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
-from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+from src.datasets.llava_next_processors import CustomLlavaNextImageProcessor
 from src.models.frozen_llava_next import FrozenLlavaNext
 from src.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE

@@ -6,7 +6,7 @@ import argparse
 from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
 from xtuner.utils.templates import PROMPT_TEMPLATE
 from transformers import AutoTokenizer
-from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+from src.datasets.llava_next_processors import CustomLlavaNextImageProcessor
 from src.datasets.gcg import GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset
 from src.datasets.png import PNGDataset
 from tqdm import tqdm

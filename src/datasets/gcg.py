@@ -37,7 +37,8 @@ def gcg_collate_fn(instances: Sequence[Dict]):
 class GCGDataset(Dataset):
     def __init__(self, json_file,
                  image_processor=None, tokenizer=None,
-                 ceph_path=None, local_path=None, prompt_template=None):
+                 ceph_path=None, local_path=None, prompt_template=None,
+                 prompt='<image>\nWhat is shown in this image?'):
         super().__init__()
         self._load_annotations(json_file)
         self.ceph_path = ceph_path
@@ -53,7 +54,7 @@ class GCGDataset(Dataset):
         else:
             self.image_processor = image_processor
         self.prompt = self.tokenizer.encode(
-            prompt_template['INSTRUCTION'].format(input='<image>\nWhat is shown in this image?'),
+            prompt_template['INSTRUCTION'].format(input=prompt),
             add_special_tokens=True)
         self.prompt_template = prompt_template
 
@@ -381,7 +382,7 @@ if __name__ == '__main__':
     dataset_list = []
     from xtuner.utils.templates import PROMPT_TEMPLATE
     from transformers import AutoTokenizer
-    from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+    from src.datasets.llava_next_processors import CustomLlavaNextImageProcessor
     prompt_template = PROMPT_TEMPLATE.mistral
     ha_dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
                             local_path='data/GranDf_HA_images/train',
