@@ -1,19 +1,3 @@
-# coding=utf-8
-# Copyright 2022 The HuggingFace Inc. team. All rights reserved.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-"""Image processor class for CLIP."""
-
 from typing import Dict, List, Optional, Union
 
 import numpy as np
@@ -29,6 +13,7 @@ from transformers.image_utils import (
     ChannelDimension,
     ImageInput,
     PILImageResampling,
+    get_image_size,
     infer_channel_dimension_format,
     is_scaled_image,
     make_list_of_images,
@@ -39,6 +24,8 @@ from transformers.image_utils import (
 )
 from transformers.utils import TensorType
 from transformers.models.clip.image_processing_clip import logger, CLIPImageProcessor
+from frozen_llava.utils import multi_apply
+from xtuner.dataset.utils import expand2square
 
 
 class CustomLlavaImageProcessor(CLIPImageProcessor):
@@ -72,6 +59,13 @@ class CustomLlavaImageProcessor(CLIPImageProcessor):
         if "shortest_edge" in size:
             size = size["shortest_edge"]
             default_to_square = False
+            # customization: force the largest edge to size
+            h, w = get_image_size(image, channel_dim=input_data_format)
+            rescale = size / max(h, w)
+            target_h, target_w = int(h * rescale), int(w * rescale)
+            assert max(target_h, target_w) == size
+            size = (target_h, target_w)
+
         elif "height" in size and "width" in size:
             size = (size["height"], size["width"])
         else:
@@ -163,16 +157,21 @@ class CustomLlavaImageProcessor(CLIPImageProcessor):
             # We assume that all images have the same channel dimension format.
             input_data_format = infer_channel_dimension_format(images[0])
 
+        image_sizes = [get_image_size(image, channel_dim=input_data_format) for image in images]
+
         if do_resize:
             images = [
                 self.resize(image=image, size=size, resample=resample, input_data_format=input_data_format)
                 for image in images
             ]
 
-        if do_center_crop:
-            images = [
-                self.center_crop(image=image, size=crop_size, input_data_format=input_data_format) for image in images
-            ]
+        # we do not apppy center crop
+        # if do_center_crop:
+        #     images = [
+        #         self.center_crop(image=image, size=crop_size, input_data_format=input_data_format) for image in images
+        #     ]
+
+        images, meta_datas = multi_apply(self.pad, images)
 
         if do_rescale:
             images = [
@@ -190,5 +189,35 @@ class CustomLlavaImageProcessor(CLIPImageProcessor):
             to_channel_dimension_format(image, data_format, input_channel_dim=input_data_format) for image in images
         ]
 
-        data = {"pixel_values": images}
+        data = {"pixel_values": images, "image_sizes": image_sizes, "meta_datas": meta_datas}
+
         return BatchFeature(data=data, tensor_type=return_tensors)
+
+
+    def pad(self, image):
+        pad_value = np.array(tuple(int(x * 255) for x in self.image_mean), dtype=image.dtype)
+        assert isinstance(image, np.ndarray)
+        h, w, _ = image.shape
+        size = max(h, w)
+        new_image = np.ones((size, size, 3), dtype=image.dtype) * pad_value
+
+        pad_height, pad_width = size - h, size - w
+        before_height, before_width = pad_height // 2, pad_width // 2
+        after_height, after_width = pad_height - before_height, pad_width - before_width
+        
+        new_image[before_height:size-after_height, before_width:size-after_width] = image
+        
+        meta = dict(padding=dict(before_height=before_height, after_height=after_height,
+                                 before_width=before_width, after_width=after_width),
+                    image_shape=dict(height=h, width=w),
+                    padded_shape=dict(height=size, width=size))
+
+        return new_image, meta
+
+
+if __name__ == "__main__":
+    image_processor = CustomLlavaImageProcessor.from_pretrained("openai/clip-vit-large-patch14-336")
+    from PIL import Image
+    image_path = "data/coco/val2017/000000000139.jpg"
+    image = Image.open(image_path)
+    data = image_processor.preprocess(image)

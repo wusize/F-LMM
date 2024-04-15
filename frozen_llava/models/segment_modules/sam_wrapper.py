@@ -55,12 +55,25 @@ class SAMWrapper(nn.Module):
 
         return features, original_image_size, input_size
 
+    def generate_prompt_masks(self, masks, input_size):
+        import pdb; pdb.set_trace()
+        pad_value = min(-1.0, masks.min().item())
+        masks = F.interpolate(masks[:, None].float(), size=input_size, mode='bilinear').to(masks)
+        _, h, w = masks.shape
+        masks = F.pad(masks, (0, self.model.image_encoder.img_size - w,
+                              0, self.model.image_encoder.img_size - h), value=pad_value)
+        prompt_masks = F.interpolate(masks.float(), size=(256, 256), mode='bilinear').to(masks)
+
+        return prompt_masks
+
+
     def forward(self, image, pred_masks, text_embeds):
         # masks are in logits
         image_embedding, original_image_size, input_size = self.encode_image(image)
         if self.training:
             image_embedding.requires_grad = True
-        prompt_masks = F.interpolate(pred_masks[:, None].float(), size=(256, 256), mode='bilinear').to(pred_masks)
+        import pdb; pdb.set_trace()
+        prompt_masks = self.generate_prompt_masks(pred_masks, input_size)
 
         pred_masks = F.interpolate(pred_masks.detach()[None].float().sigmoid(),
                                    size=original_image_size, mode='bilinear')[0]
