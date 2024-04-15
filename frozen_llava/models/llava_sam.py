@@ -42,7 +42,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         sam_accuracy = 0
         sam_aiou = 0
         text_layer_weights = self.get_text_layer_weights()
-        print(f"Start: Device: {self.device}", flush=True)
+        # print(f"Start: Device: {self.device}", flush=True)
         for data_sample in data:
             assert data_sample['pixel_values'].shape[0] > 1
             inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
@@ -119,9 +119,9 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
                                      size=(fine_image_feature_h, fine_image_feature_w))[0].to(self.llava.dtype)
             assert pred_masks.shape == gt_masks.shape
-            # sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
-            # sam_gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
-            #                              size=sam_pred_masks.shape[-2:])[0].to(self.llava.dtype)
+            sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
+            sam_gt_masks = F.interpolate(masks.to(attention_maps)[None].float(),
+                                         size=sam_pred_masks.shape[-2:])[0].to(self.llava.dtype)
             mask_cnts += mask_cnt
 
             loss_dice_, loss_mask_, accuracy_, aiou_ = self._compute(pred_masks, gt_masks)
@@ -130,28 +130,28 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             accuracy += accuracy_ * mask_cnt
             aiou += aiou_ * mask_cnt
 
-            # sam_loss_dice_, sam_loss_mask_, sam_accuracy_, sam_aiou_ = self._compute(sam_pred_masks, sam_gt_masks)
-            # sam_loss_dice += sam_loss_dice_ * mask_cnt
-            # sam_loss_mask += sam_loss_mask_ * mask_cnt
-            # sam_accuracy += sam_accuracy_ * mask_cnt
-            # sam_aiou += sam_aiou_ * mask_cnt
+            sam_loss_dice_, sam_loss_mask_, sam_accuracy_, sam_aiou_ = self._compute(sam_pred_masks, sam_gt_masks)
+            sam_loss_dice += sam_loss_dice_ * mask_cnt
+            sam_loss_mask += sam_loss_mask_ * mask_cnt
+            sam_accuracy += sam_accuracy_ * mask_cnt
+            sam_aiou += sam_aiou_ * mask_cnt
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
                      'loss_dice': loss_dice / mask_cnts,
                      'accuracy': accuracy / mask_cnts,
                      'aiou': aiou / mask_cnts,
-                     # 'sam_loss_mask': sam_loss_mask / mask_cnts,
-                     # 'sam_loss_dice': sam_loss_dice / mask_cnts,
-                     # 'sam_accuracy': sam_accuracy / mask_cnts,
-                     # 'sam_aiou': sam_aiou / mask_cnts,
+                     'sam_loss_mask': sam_loss_mask / mask_cnts,
+                     'sam_loss_dice': sam_loss_dice / mask_cnts,
+                     'sam_accuracy': sam_accuracy / mask_cnts,
+                     'sam_aiou': sam_aiou / mask_cnts,
                      }
         for k, v in loss_dict.items():
             if 'sam_loss' in k:
                 loss_dict[k] *= self.sam_weight
             elif 'loss' in k:
                 loss_dict[k] *= self.intermediate_weight
-        print(f"Finish. Device: {self.device}. Loss dict: {loss_dict}", flush=True)
+        # print(f"Finish. Device: {self.device}. Loss dict: {loss_dict}", flush=True)
         # if aiou == 0:
         #     print(f"data samples {data}, device: {self.device}. {gt_masks.mean()}", flush=True)
 
