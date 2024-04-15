@@ -7,7 +7,7 @@ from segment_anything.utils.transforms import ResizeLongestSide
 
 
 def mask2box(mask):
-    ys, xs = np.where(mask)
+    ys, xs = np.where(mask > 0)
     y0, y1 = ys.min(), ys.max()
     x0, x1 = xs.min(), xs.max()
 

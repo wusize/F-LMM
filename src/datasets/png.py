@@ -159,18 +159,22 @@ class PNGDataset(Dataset):
 
 if __name__ == '__main__':
     from xtuner.utils.templates import PROMPT_TEMPLATE
-    prompt_template = PROMPT_TEMPLATE.mistral
+    # prompt_template = PROMPT_TEMPLATE.mistral
+    prompt_template = PROMPT_TEMPLATE.vicuna
     from transformers import AutoTokenizer
     from transformers import AutoTokenizer
-    from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+    # from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
     from src.datasets.llava_image_processor import CustomLlavaImageProcessor
     from tqdm import tqdm
     dataset = PNGDataset(json_file='data/png_coco_val2017.json',
                          panoptic_json_file='data/coco/annotations/panoptic_val2017.json',
                          panoptic_png_path='data/coco/panoptic_val2017',
+                         # tokenizer=dict(
+                         #     type=AutoTokenizer.from_pretrained,
+                         #     pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
                          tokenizer=dict(
                              type=AutoTokenizer.from_pretrained,
-                             pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
+                             pretrained_model_name_or_path='liuhaotian/llava-v1.5-7b'),
                          # image_processor=dict(
                          #     type=CustomLlavaNextImageProcessor.from_pretrained,
                          #     pretrained_model_name_or_path='llava-hf/llava-v1.6-mistral-7b-hf'),
