@@ -208,10 +208,10 @@ class FrozenFuyuSAM(FrozenFuyu):
                  *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sam = BUILDER.build(sam)
-        self.text_proj = nn.Linear(self.llava.config.text_config.hidden_size,
+        self.text_proj = nn.Linear(self.fuyu.config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
         self.text_layer_weights = nn.Parameter(
-            torch.ones(self.llava.config.text_config.num_hidden_layers))
+            torch.ones(self.fuyu.config.num_hidden_layers))
         self.sam_weight = sam_weight
         self.intermediate_weight = intermediate_weight
 

@@ -25,7 +25,6 @@ from transformers.image_utils import (
 from transformers.utils import TensorType
 from transformers.models.clip.image_processing_clip import logger, CLIPImageProcessor
 from src.utils import multi_apply
-from xtuner.dataset.utils import expand2square
 
 
 class CustomLlavaImageProcessor(CLIPImageProcessor):
