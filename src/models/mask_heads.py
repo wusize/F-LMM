@@ -112,7 +112,7 @@ class UNetHead(UNet):
             h, w = x.shape[-2:]   # upsample the low-res input to get better results
             tok = time()
             if tok - tik > 0.1:
-                print(f"Interpolate mask attentions: {tok - tik}. Device: {x.device}, {x.shape}")
+                print(f"Interpolate mask attentions: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
 
         dividend = 2**(self.num_stages - 1)
         padded_h = math.ceil(h / dividend) * dividend
@@ -125,12 +125,12 @@ class UNetHead(UNet):
         x = self.timed_forward(padded_x)[-1][..., :h, :w]
         tok = time()
         if tok - tik > 0.1:
-            print(f"Unet forward: {tok - tik}. Device: {x.device}, {x.shape}")
+            print(f"Unet forward: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
         tik = time()
         masks = self.conv_seg(x)
         tok = time()
         if tok - tik > 0.1:
-            print(f"Segment: {tok - tik}. Device: {x.device}, {x.shape}")
+            print(f"Segment: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
 
         return masks
 
@@ -139,7 +139,7 @@ class UNetHead(UNet):
         self._check_input_divisible(x)
         tok = time()
         if tok - tik > 0.1:
-            print(f"Check divisibility: {tok - tik}. Device: {x.device}, {x.shape}")
+            print(f"Check divisibility: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
         enc_outs = []
         tik = time()
         for enc in self.encoder:
@@ -147,7 +147,7 @@ class UNetHead(UNet):
             enc_outs.append(x)
         tok = time()
         if tok - tik > 0.1:
-            print(f"Encoder forward: {tok - tik}. Device: {x.device}, {x.shape}")
+            print(f"Encoder forward: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
 
         tik = time()
         dec_outs = [x]
@@ -156,7 +156,7 @@ class UNetHead(UNet):
             dec_outs.append(x)
         tok = time()
         if tok - tik > 0.1:
-            print(f"Decoder forward: {tok - tik}. Device: {x.device}, {x.shape}")
+            print(f"Decoder forward: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
 
         return dec_outs
 

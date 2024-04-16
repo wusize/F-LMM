@@ -122,7 +122,6 @@ class FrozenFuyu(BaseModel):
 
         return pred_masks
 
-
     def compute_loss(self, data):
         mask_cnts = 0
         loss_dice = 0
@@ -200,6 +199,8 @@ class FrozenFuyu(BaseModel):
 
 
 from time import time
+
+
 class FrozenFuyuSAM(FrozenFuyu):
     def __init__(self,
                  sam,
