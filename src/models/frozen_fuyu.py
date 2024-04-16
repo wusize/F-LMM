@@ -241,7 +241,8 @@ class FrozenFuyuSAM(FrozenFuyu):
                                 image_patches_indices=image_patches_indices,
                                 attention_mask=attention_mask,
                                 output_hidden_states=True,
-                                output_attentions=True)
+                                output_attentions=True,
+                                use_cache=False)
         tok = time()
         if tok - tik > 1.0:
             print(f"Fuyu forward time: {tok - tik}. Device: {input_ids.device}, {input_ids.shape}",
@@ -266,17 +267,17 @@ class FrozenFuyuSAM(FrozenFuyu):
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
 
-
             # num_layers, matched_seq_len, hidden_size
             matched_hidden_states = torch.stack([hs[0, matched] for hs in hidden_states])
             matched_hidden_states *= text_layer_weights.view(-1, 1, 1)
             # matched_seq_len, hidden_size
             text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.sam.dtype)))
+            del matched_hidden_states
         del attentions, hidden_states
 
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-        if self.training:
-            mask_attentions.requires_grad = True
+        # if self.training:
+        #     mask_attentions.requires_grad = True
         # import pdb; pdb.set_trace()
         tik = time()
         pred_masks = self.mask_head(mask_attentions)[:, 0]
@@ -303,7 +304,6 @@ class FrozenFuyuSAM(FrozenFuyu):
                   flush=True)
 
         return pred_masks, sam_pred_masks
-
 
     @torch.no_grad()
     def predict(self, data_sample):
