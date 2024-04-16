@@ -106,7 +106,7 @@ class GCGDataset(Dataset):
                 continue
             assert caption[obj_start:obj_end].lower() == phrase.lower()
 
-            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>"
             # load mask
             mask = np.zeros((sample_data['height'], sample_data['width']), dtype=np.uint8)
             for rle_mask in obj_info['rle_masks']:
@@ -121,7 +121,7 @@ class GCGDataset(Dataset):
         input_ids = torch.tensor(input_ids, dtype=torch.long)
 
         # Fixme: when special tokens are followed by punctuations, the behaviour is different
-        input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[0]]
+        # input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[-1]]
 
         final_input_ids = []
         mask_ids = []
@@ -187,7 +187,7 @@ class RefCOCOGForGCGDataset(GCGDataset):
                 obj_end = obj_start + len(ref['sentence'])
                 segmentations.append(ref['segmentation'])
 
-                new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+                new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>"
                 last_end = obj_end
                 mask_cnt += 1
 
@@ -198,7 +198,7 @@ class RefCOCOGForGCGDataset(GCGDataset):
         input_ids = torch.tensor(input_ids, dtype=torch.long)
 
         # Fixme: when special tokens are followed by punctuations, the behaviour is different
-        input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[0]]
+        # input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[-1]]
 
         final_input_ids = []
         mask_ids = []
@@ -312,14 +312,14 @@ class FlickrForGCGDataset(GCGDataset):
         for tokens_positive_idx in tokens_positive_order:
             obj_start, obj_end = tokens_positive_list[tokens_positive_idx]
             assert obj_start >= last_end
-            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>,"
+            new_caption += f"{caption[last_end:obj_start].strip()}<mask>{caption[obj_start:obj_end]}</mask>"
             last_end = obj_end
 
         input_ids = self.prompt + self.tokenizer.encode(new_caption, add_special_tokens=False)
         input_ids = torch.tensor(input_ids, dtype=torch.long)
 
         # Fixme: when special tokens are followed by punctuations, the behaviour is different
-        input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[0]]
+        # input_ids = input_ids[input_ids != self.tokenizer.encode(',', add_special_tokens=False)[-1]]
 
         final_input_ids = []
         mask_ids = []

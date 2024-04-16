@@ -214,9 +214,27 @@ class CustomLlavaImageProcessor(CLIPImageProcessor):
         return new_image, meta
 
 
-if __name__ == "__main__":
-    image_processor = CustomLlavaImageProcessor.from_pretrained("openai/clip-vit-large-patch14-336")
-    from PIL import Image
-    image_path = "data/coco/val2017/000000000139.jpg"
-    image = Image.open(image_path)
-    data = image_processor.preprocess(image)
+if __name__ == '__main__':
+    from xtuner.utils.templates import PROMPT_TEMPLATE
+    # prompt_template = PROMPT_TEMPLATE.mistral
+    prompt_template = PROMPT_TEMPLATE.vicuna
+    from transformers import AutoTokenizer
+    from src.datasets.gcg import GCGDataset
+    # from src.datasets.llava_next_image_processor import CustomLlavaNextImageProcessor
+    from tqdm import tqdm
+
+
+    dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
+                         local_path='data/GranDf_HA_images/train',
+                         prompt_template=prompt_template,
+                         tokenizer=dict(
+                             type=AutoTokenizer.from_pretrained,
+                             pretrained_model_name_or_path='llava-hf/llava-1.5-7b-hf'),
+                         image_processor=dict(
+                             type=CustomLlavaImageProcessor.from_pretrained,
+                             pretrained_model_name_or_path='openai/clip-vit-large-patch14-336'),
+                         prompt='What is shown in this image?'
+                         )
+
+    for i in tqdm(range(len(dataset))):
+        data = dataset.__getitem__(i)

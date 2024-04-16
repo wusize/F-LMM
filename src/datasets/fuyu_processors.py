@@ -1,4 +1,4 @@
-from transformers import LlamaTokenizerFast, FuyuImageProcessor
+from transformers import LlamaTokenizer, FuyuImageProcessor
 from typing import Dict, Optional, Union
 from transformers.image_transforms import to_channel_dimension_format
 from transformers.image_utils import (
@@ -20,23 +20,6 @@ fuyu_template = dict(
     SYSTEM='',
     INSTRUCTION='{input}\n\x04',
     SEP='\n')
-
-
-class CustomFuyuTokenizer(LlamaTokenizerFast):
-    @classmethod
-    def from_pretrained(cls, *args, **kwargs,):
-        tokenizer = super().from_pretrained(*args, **kwargs)
-        tokenizer.bos_token = "<s>"
-        tokenizer.pad_token_id = tokenizer.eos_token_id  # 0
-        tokenizer.padding_side = 'right'  # 'left'
-
-        special_tokens_dict = {'additional_special_tokens': ['<image>']}
-        num_added_toks = tokenizer.add_special_tokens(special_tokens_dict)
-        assert num_added_toks == 1
-        tokenizer.update_post_processor()
-
-        return tokenizer
-
 
 class CustomFuyuImageProcessor(FuyuImageProcessor):
     def preprocess(
@@ -280,13 +263,35 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
 
 
 if __name__ == "__main__":
-    tokenizer = CustomFuyuTokenizer.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b')
+    from transformers import AutoTokenizer
+    tokenizer = LlamaTokenizer.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b',
+                                               bos_token = "<s>", padding_side = 'right', pad_token='|ENDOFTEXT|')
+    # tokenizer = CustomFuyuTokenizer.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b')
     image_processor = CustomFuyuImageProcessor.from_pretrained(pretrained_model_name_or_path='adept/fuyu-8b',
                                                                size={'height': 960, 'width': 960})
-    encoded = tokenizer.encode('<image>what is in this image?\n\x04')
+    encoded = tokenizer.encode('what is in this image?\n\x04')
     for enc in encoded:
         print(tokenizer.decode(enc), flush=True)
-    from PIL import Image
-    image = Image.open('src/datasets/000000000139.jpg').convert('RGB')
-    image_data = image_processor.preprocess(image)
+    # from PIL import Image
+    # image = Image.open('src/datasets/000000000139.jpg').convert('RGB')
+    # image_data = image_processor.preprocess(image)
 
+    from src.datasets.gcg import GCGDataset
+    from tqdm import tqdm
+
+    dataset = GCGDataset(json_file='data/GranDf_HA_GCG_train.json',
+                         local_path='data/GranDf_HA_images/train',
+                         prompt_template=fuyu_template,
+                         tokenizer=dict(
+                             type=AutoTokenizer.from_pretrained,
+                             pretrained_model_name_or_path='adept/fuyu-8b',
+                             bos_token="<s>", padding_side='right', pad_token='|ENDOFTEXT|'),
+                         image_processor=dict(
+                             type=CustomFuyuImageProcessor.from_pretrained,
+                             pretrained_model_name_or_path='adept/fuyu-8b',
+                             size={'height': 960, 'width': 960}),
+                         prompt='What is shown in this image?'
+                         )
+
+    for i in tqdm(range(len(dataset))):
+        data = dataset.__getitem__(i)
