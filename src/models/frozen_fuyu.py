@@ -219,7 +219,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         return torch.softmax(self.text_layer_weights, dim=0)
 
     def _forward(self, data_sample):
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         text_layer_weights = self.get_text_layer_weights()
         input_ids = data_sample['input_ids'].to(self.fuyu.device)
         mask_ids = data_sample['mask_ids'].to(self.fuyu.device)
