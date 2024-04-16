@@ -133,6 +133,32 @@ class UNetHead(UNet):
 
         return masks
 
+    def timed_forward(self, x):
+        tik = time()
+        self._check_input_divisible(x)
+        tok = time()
+        if tok - tik > 0.1:
+            print(f"Check divisibility: {tok - tik}. Device: {x.device}, {x.shape}")
+        enc_outs = []
+        tik = time()
+        for enc in self.encoder:
+            x = enc(x)
+            enc_outs.append(x)
+        tok = time()
+        if tok - tik > 0.1:
+            print(f"Encoder forward: {tok - tik}. Device: {x.device}, {x.shape}")
+
+        tik = time()
+        dec_outs = [x]
+        for i in reversed(range(len(self.decoder))):
+            x = self.decoder[i](enc_outs[i], x)
+            dec_outs.append(x)
+        tok = time()
+        if tok - tik > 0.1:
+            print(f"Decoder forward: {tok - tik}. Device: {x.device}, {x.shape}")
+
+        return dec_outs
+
 
 if __name__ == '__main__':
     from mmseg.models.backbones.unet import InterpConv
