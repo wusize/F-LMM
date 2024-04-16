@@ -50,6 +50,10 @@ class Sam(nn.Module):
     def device(self) -> Any:
         return self.pixel_mean.device
 
+    @property
+    def dtype(self) -> Any:
+        return self.pixel_mean.dtype
+
     @torch.no_grad()
     def forward(
         self,

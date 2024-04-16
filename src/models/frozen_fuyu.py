@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 
-
 @torch.no_grad()
 def compute_mask_IoU(masks, target):
     temp = masks * target
@@ -13,29 +12,31 @@ def compute_mask_IoU(masks, target):
     return intersection / (union + 1e-12)
 
 
-class FrozenLlava(BaseModel):
+class FrozenFuyu(BaseModel):
 
     def __init__(self,
                  model,
+                 tokenizer,
                  mask_head,
                  merge='mean',
                  loss_mask=None,
                  loss_dice=None):
         super().__init__()
-        self.llava = BUILDER.build(model)
-        self.llava.requires_grad_(False)
-        in_channels = (self.llava.config.text_config.num_attention_heads *
-                       self.llava.config.text_config.num_hidden_layers)
-        mask_head.update(
-            in_channels=in_channels)
+        self.fuyu = BUILDER.build(model)
+        self.fuyu.requires_grad_(False)
+        self.tokenizer = BUILDER.build(tokenizer)
+        in_channels = self.fuyu.config.num_attention_heads * self.fuyu.config.num_hidden_layers
+        mask_head.update(in_channels=in_channels)
         self.mask_head = BUILDER.build(mask_head)
-        self.patch_size = self.llava.config.vision_config.patch_size
+        self.patch_size = self.fuyu.config.patch_size
+        self.image_placeholder_id = self.tokenizer.vocab['|SPEAKER|']
+        self.image_newline_id = self.tokenizer.vocab['|NEWLINE|']
+
         self.merge = merge
         assert merge in ['mean', 'max']
 
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
-
 
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
@@ -49,7 +50,7 @@ class FrozenLlava(BaseModel):
         pass
 
     def train(self, mode=True):
-        self.llava.train(mode=False)
+        self.fuyu.train(mode=False)
         self.mask_head.train(mode=mode)
         self.training = mode
         return self
@@ -65,33 +66,40 @@ class FrozenLlava(BaseModel):
             raise NotImplementedError
 
     def _forward(self, data_sample):
-        inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
-                      mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
-                      pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
-                                                                        dtype=self.llava.dtype)
-                      )
-        attention_mask = torch.ones(inputs['input_ids'].shape, device=self.llava.device,
-                                    dtype=torch.bool)
+        input_ids = data_sample['input_ids'].to(self.fuyu.device)
+        mask_ids = data_sample['mask_ids'].to(self.fuyu.device)
+        image_tensor = data_sample['pixel_values'].to(device=self.fuyu.device, dtype=self.fuyu.dtype)
+
+        image_patches, image_patches_indices, image_token_ids = self._patchify(image_tensor[None])
+
+        mask_ids = torch.cat([-torch.ones_like(image_token_ids[0]), mask_ids], dim=0)   # len
+        image_patches_indices = torch.cat([image_patches_indices,
+                                           -torch.ones_like(input_ids)[None]], dim=-1)
+        input_ids = torch.cat([image_token_ids, input_ids[None]], dim=1)   # bs=1, len
+        attention_mask = torch.ones_like(input_ids)
+
         meta_data = data_sample['meta_data']
         with torch.no_grad():
-            outputs = self.llava(**inputs,
-                                 attention_mask=attention_mask,
-                                 # output_hidden_states=True,
-                                 output_attentions=True)
-        mask_ids = outputs['mask_ids']
-        attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
+            outputs = self.fuyu(input_ids=input_ids,
+                                image_patches=image_patches,
+                                image_patches_indices=image_patches_indices,
+                                attention_mask=attention_mask,
+                                # output_hidden_states=True,
+                                output_attentions=True)
+
+        attentions = [attn[0, ..., image_patches_indices[0] >= 0]
                       for attn in outputs.attentions]
         del outputs
 
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        llava_h, llava_w = padded_h // self.patch_size,  padded_w // self.patch_size
+        fuyu_h, fuyu_w = padded_h // self.patch_size,  padded_w // self.patch_size
 
-        attentions = [attn.view(*attn.shape[:-1], llava_h, llava_w) for attn in attentions]
+        attentions = [attn.view(*attn.shape[:-1], fuyu_h, fuyu_w) for attn in attentions]
         masks = data_sample['masks']
         mask_attentions = []
 
         for mask_id in range(len(masks)):
-            matched = mask_ids[0] == mask_id
+            matched = mask_ids == mask_id
             assert matched.sum() > 0
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
@@ -124,7 +132,7 @@ class FrozenLlava(BaseModel):
 
         for data_sample in data:
             pred_masks = self._forward(data_sample)
-            masks = data_sample['masks'].to(self.llava.device)
+            masks = data_sample['masks'].to(self.fuyu.device)
             gt_masks = F.interpolate(masks[None].float(),
                                      size=pred_masks.shape[-2:])[0].to(pred_masks)
             mask_cnt = pred_masks.shape[0]
@@ -168,8 +176,31 @@ class FrozenLlava(BaseModel):
 
         return pred_masks
 
+    def _patchify(self, inputs):
+        bs, c, h, w = inputs.shape
+        image_patches = inputs.view(bs, c, h // self.patch_size, self.patch_size,
+                                    w // self.patch_size, self.patch_size)
+        image_patches = image_patches.permute(
+            0, 2, 4, 3, 5, 1).contiguous().view(bs, -1, (self.patch_size ** 2) * c)
 
-class FrozenLlavaSAM(FrozenLlava):
+        image_patches_indices = torch.arange(
+            image_patches.shape[1], dtype=torch.long,
+            device=self.fuyu.device).view(h // self.patch_size, w // self.patch_size)
+        image_patches_indices = torch.cat([image_patches_indices,
+                                           -torch.ones_like(image_patches_indices[:, :1])
+                                           ], dim=-1)
+
+        image_token_ids = torch.ones_like(image_patches_indices) * self.image_placeholder_id
+        image_token_ids[:, -1] = self.image_newline_id
+
+        image_patches_indices = image_patches_indices.view(1, -1).repeat(bs, 1)
+        image_token_ids = image_token_ids.view(1, -1).repeat(bs, 1)
+
+        return image_patches.to(self.fuyu.dtype), image_patches_indices, image_token_ids
+
+
+
+class FrozenFuyuSAM(FrozenFuyu):
     def __init__(self,
                  sam,
                  sam_weight=1.0,
@@ -188,38 +219,48 @@ class FrozenLlavaSAM(FrozenLlava):
         return torch.softmax(self.text_layer_weights, dim=0)
 
     def _forward(self, data_sample):
+        import pdb; pdb.set_trace()
         text_layer_weights = self.get_text_layer_weights()
-        inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
-                      mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
-                      pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
-                                                                        dtype=self.llava.dtype)
-                      )
-        attention_mask = torch.ones(inputs['input_ids'].shape, device=self.llava.device,
-                                    dtype=torch.bool)
+        input_ids = data_sample['input_ids'].to(self.fuyu.device)
+        mask_ids = data_sample['mask_ids'].to(self.fuyu.device)
+        image_tensor = data_sample['pixel_values'].to(device=self.fuyu.device, dtype=self.fuyu.dtype)
+
+        image_patches, image_patches_indices, image_token_ids = self._patchify(image_tensor[None])
+
+        mask_ids = torch.cat([-torch.ones_like(image_token_ids[0]), mask_ids], dim=0)   # len
+        image_patches_indices = torch.cat([image_patches_indices,
+                                           -torch.ones_like(input_ids)[None]], dim=-1)
+        input_ids = torch.cat([image_token_ids, input_ids[None]], dim=1)   # bs=1, len
+        attention_mask = torch.ones_like(input_ids)
+
         meta_data = data_sample['meta_data']
         with torch.no_grad():
-            outputs = self.llava(**inputs,
-                                 attention_mask=attention_mask,
-                                 output_hidden_states=True,
-                                 output_attentions=True)
-        mask_ids = outputs['mask_ids']
-        attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
+            outputs = self.fuyu(input_ids=input_ids,
+                                image_patches=image_patches,
+                                image_patches_indices=image_patches_indices,
+                                attention_mask=attention_mask,
+                                output_hidden_states=True,
+                                output_attentions=True)
+
+        attentions = [attn[0, ..., image_patches_indices[0] >= 0]
                       for attn in outputs.attentions]
-        hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        hidden_states = outputs.hidden_states[-self.fuyu.config.num_hidden_layers:]
+
         del outputs
 
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
+        fuyu_h, fuyu_w = padded_h // self.patch_size,  padded_w // self.patch_size
 
-        attentions = [attn.view(*attn.shape[:-1], llava_h, llava_w) for attn in attentions]
+        attentions = [attn.view(*attn.shape[:-1], fuyu_h, fuyu_w) for attn in attentions]
         masks = data_sample['masks']
         mask_attentions = []
         text_embeds = []
         for mask_id in range(len(masks)):
-            matched = mask_ids[0] == mask_id
+            matched = mask_ids == mask_id
             assert matched.sum() > 0
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
+
 
             # num_layers, matched_seq_len, hidden_size
             matched_hidden_states = torch.stack([hs[0, matched] for hs in hidden_states])
@@ -227,7 +268,7 @@ class FrozenLlavaSAM(FrozenLlava):
             # matched_seq_len, hidden_size
             text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.sam.dtype)))
 
-        del attentions, hidden_states
+        del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         if self.training:
             mask_attentions.requires_grad = True
@@ -240,11 +281,13 @@ class FrozenLlavaSAM(FrozenLlava):
 
         mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
-        pred_masks \
-            = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+
+        pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w]
+
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
 
         return pred_masks, sam_pred_masks
+
 
     @torch.no_grad()
     def predict(self, data_sample):

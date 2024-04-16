@@ -40,6 +40,10 @@ class SAMWrapper(nn.Module):
         self.training = mode
         return self
 
+    @property
+    def dtype(self):
+        return self.model.dtype
+
     @torch.no_grad()
     def encode_image(self, image):
         image = np.array(image.convert(self.model.image_format))

@@ -96,6 +96,10 @@ class UNetHead(UNet):
         self.init_weights()
         self.upsample_input = upsample_input
 
+    @property
+    def dtype(self):
+        return self.conv_seg.weight.dtype
+
     def forward(self, x):
         h, w = x.shape[-2:]
         if self.upsample_input is not None:

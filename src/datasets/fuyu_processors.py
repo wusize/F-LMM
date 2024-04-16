@@ -12,9 +12,9 @@ from transformers.image_utils import (
 )
 from transformers.utils import TensorType
 from transformers.models.fuyu.image_processing_fuyu import make_list_of_list_of_images, logger, FuyuBatchFeature
-from transformers.image_transforms import resize
+from transformers.image_transforms import resize, pad
 import numpy as np
-
+import math
 
 fuyu_template = dict(
     SYSTEM='',
@@ -191,10 +191,10 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
             ]
         meta_datas = [
             dict(image_shape=dict(height=image_h[0], width=image_w[0]),
-                 padded_shape=size,
-                 padding=dict(before_height=0, after_height=size['height'] - image_h[0],
-                              before_width=0, after_width=size['width'] - image_w[0]))
-            for image_h, image_w in zip(image_unpadded_heights, image_unpadded_widths)
+                 padded_shape=dict(height=img[0].shape[-2], width=img[0].shape[-1]),
+                 padding=dict(before_height=0, after_height=img[0].shape[-2] - image_h[0],
+                              before_width=0, after_width=img[0].shape[-1] - image_w[0]))
+            for image_h, image_w, img in zip(image_unpadded_heights, image_unpadded_widths, batch_images)
         ]
         data = {
             "pixel_values": [img[0] for img in batch_images],
@@ -260,6 +260,52 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
             **kwargs,
         )
         return scaled_image
+
+
+    def pad_image(
+        self,
+        image: np.ndarray,
+        size: Dict[str, int],
+        mode: str = "constant",
+        constant_values: float = 1.0,
+        data_format: Optional[Union[str, ChannelDimension]] = None,
+        input_data_format: Optional[Union[str, ChannelDimension]] = None,
+    ) -> np.ndarray:
+        """
+        Pad an image to `(size["height"], size["width"])`.
+
+        Args:
+            image (`np.ndarray`):
+                Image to pad.
+            size (`Dict[str, int]`):
+                Dictionary in the format `{"height": int, "width": int}` specifying the size of the output image.
+            data_format (`ChannelDimension` or `str`, *optional*):
+                The data format of the output image. If unset, the same format as the input image is used.
+            input_data_format (`ChannelDimension` or `str`, *optional*):
+                The channel dimension format of the input image. If not provided, it will be inferred.
+        """
+        image_height, image_width = get_image_size(image, input_data_format)
+        # target_height, target_width = size["height"], size["width"]
+
+        patch_height, patch_width = self.patch_size["height"], self.patch_size["width"]
+        target_height = math.ceil(image_height / patch_height) * patch_height
+        target_width = math.ceil(image_width / patch_width) * patch_width
+
+        # todo: pad to be a multiple of patch size
+        padding_top = 0
+        padding_left = 0
+        padding_bottom = target_height - image_height
+        padding_right = target_width - image_width
+        padded_image = pad(
+            image,
+            padding=((padding_top, padding_bottom), (padding_left, padding_right)),
+            mode=mode,
+            constant_values=constant_values,
+            data_format=data_format,
+            input_data_format=input_data_format,
+        )
+        return padded_image
+
 
 
 if __name__ == "__main__":
