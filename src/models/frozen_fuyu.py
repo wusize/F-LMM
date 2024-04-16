@@ -246,8 +246,6 @@ class FrozenFuyuSAM(FrozenFuyu):
 
         print(f"Fuyu forward time: {time() - tik}", flush=True)
 
-        tik = time()
-
         attentions = [attn[0, ..., image_patches_indices[0] >= 0]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.fuyu.config.num_hidden_layers:]
@@ -278,7 +276,9 @@ class FrozenFuyuSAM(FrozenFuyu):
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         if self.training:
             mask_attentions.requires_grad = True
+        tik = time()
         pred_masks = self.mask_head(mask_attentions)[:, 0]
+        print(f"Mask head forward time: {time() - tik}", flush=True)
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
 
@@ -289,7 +289,6 @@ class FrozenFuyuSAM(FrozenFuyu):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
 
         pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w].contiguous()
-        print(f"Mask head forward time: {time() - tik}", flush=True)
 
         tik = time()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
