@@ -199,7 +199,7 @@ class FrozenFuyu(BaseModel):
         return image_patches.to(self.fuyu.dtype), image_patches_indices, image_token_ids
 
 
-
+from time import time
 class FrozenFuyuSAM(FrozenFuyu):
     def __init__(self,
                  sam,
@@ -234,6 +234,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         attention_mask = torch.ones_like(input_ids)
 
         meta_data = data_sample['meta_data']
+        tik = time()
         with torch.no_grad():
             outputs = self.fuyu(input_ids=input_ids,
                                 image_patches=image_patches,
@@ -241,6 +242,11 @@ class FrozenFuyuSAM(FrozenFuyu):
                                 attention_mask=attention_mask,
                                 output_hidden_states=True,
                                 output_attentions=True)
+
+
+        print(f"Fuyu forward time: {time() - tik}", flush=True)
+
+        tik = time()
 
         attentions = [attn[0, ..., image_patches_indices[0] >= 0]
                       for attn in outputs.attentions]
@@ -267,8 +273,8 @@ class FrozenFuyuSAM(FrozenFuyu):
             matched_hidden_states *= text_layer_weights.view(-1, 1, 1)
             # matched_seq_len, hidden_size
             text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.sam.dtype)))
+        del attentions, hidden_states
 
-        del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         if self.training:
             mask_attentions.requires_grad = True
@@ -283,8 +289,11 @@ class FrozenFuyuSAM(FrozenFuyu):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
 
         pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w].contiguous()
+        print(f"Mask head forward time: {time() - tik}", flush=True)
 
+        tik = time()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
+        print(f"SAM forward time: {time() - tik}", flush=True)
 
         return pred_masks, sam_pred_masks
 
