@@ -234,7 +234,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         attention_mask = torch.ones_like(input_ids)
 
         meta_data = data_sample['meta_data']
-        # tik = time()
+        tik = time()
         with torch.no_grad():
             outputs = self.fuyu(input_ids=input_ids,
                                 image_patches=image_patches,
@@ -242,9 +242,10 @@ class FrozenFuyuSAM(FrozenFuyu):
                                 attention_mask=attention_mask,
                                 output_hidden_states=True,
                                 output_attentions=True)
-
-
-        # print(f"Fuyu forward time: {time() - tik}", flush=True)
+        tok = time()
+        if tok - tik > 0.01:
+            print(f"Fuyu forward time: {tok - tik}. Device: {input_ids.device}, {input_ids.shape}",
+                  flush=True)
 
         attentions = [attn[0, ..., image_patches_indices[0] >= 0]
                       for attn in outputs.attentions]
@@ -294,9 +295,12 @@ class FrozenFuyuSAM(FrozenFuyu):
 
         pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w].contiguous()
 
-        # tik = time()
+        tik = time()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
-        # print(f"SAM forward time: {time() - tik}", flush=True)
+        tok = time()
+        if tok - tik > 0.01:
+            print(f"SAM forward time: {tok - tik}. Device: {pred_masks.device}, {pred_masks.shape}",
+                  flush=True)
 
         return pred_masks, sam_pred_masks
 
