@@ -276,6 +276,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         if self.training:
             mask_attentions.requires_grad = True
+        import pdb; pdb.set_trace()
         tik = time()
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         print(f"Mask head forward time: {time() - tik}", flush=True)
