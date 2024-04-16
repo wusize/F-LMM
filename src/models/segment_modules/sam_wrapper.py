@@ -68,7 +68,6 @@ class SAMWrapper(nn.Module):
 
         return prompt_masks
 
-
     def forward(self, image, pred_masks, text_embeds):
         # masks are in logits
         image_embedding, original_image_size, input_size = self.encode_image(image)
