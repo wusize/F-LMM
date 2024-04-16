@@ -310,7 +310,7 @@ class FrozenFuyuSAM(FrozenFuyu):
 
         for data_sample in data:
             pred_masks, sam_pred_masks = self._forward(data_sample)
-            masks = data_sample['masks'].to(self.llava.device)
+            masks = data_sample['masks'].to(self.fuyu.device)
             gt_masks = F.interpolate(masks[None].float(),
                                      size=pred_masks.shape[-2:])[0].to(pred_masks)
             sam_gt_masks = F.interpolate(masks[None].float(),
