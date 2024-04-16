@@ -111,6 +111,8 @@ class CustomFuyuImageProcessor(FuyuImageProcessor):
 
         batch_images = make_list_of_list_of_images(images)
 
+        batch_images = [[img.convert('RGB') for img in imgs] for imgs in batch_images]
+
         validate_preprocess_arguments(
             do_rescale=do_rescale,
             rescale_factor=rescale_factor,
