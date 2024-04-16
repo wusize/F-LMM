@@ -36,7 +36,6 @@ class FrozenLlava(BaseModel):
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
 
-
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
             return x.mean(dim=dim)
@@ -110,10 +109,9 @@ class FrozenLlava(BaseModel):
         mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
 
-        pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w]
+        pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w].contiguous()
 
         return pred_masks
-
 
     def compute_loss(self, data):
         mask_cnts = 0

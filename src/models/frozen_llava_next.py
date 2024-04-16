@@ -215,7 +215,7 @@ class FrozenLlavaNext(BaseModel):
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
             F.interpolate(attentions_with_fine.float(),
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
-        ], dim=1).to(self.llava.dtype)
+        ], dim=1).to(self.mask_head.dtype)
         del attentions_with_coarse, attentions_with_fine
         attention_maps.requires_grad = True
         pred_masks = self.mask_head(attention_maps)[:, 0]
@@ -446,7 +446,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             matched_hidden_states = torch.stack([hs[0, matched] for hs in hidden_states])
             matched_hidden_states *= text_layer_weights.view(-1, 1, 1)
             # matched_seq_len, hidden_size
-            text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.dtype)))
+            text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.sam.dtype)))
 
         del hidden_states
 
@@ -459,7 +459,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
             F.interpolate(attentions_with_fine.float(),
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
-        ], dim=1).to(self.dtype)
+        ], dim=1).to(self.mask_head.dtype)
         del attentions_with_coarse, attentions_with_fine
         pred_masks = self.mask_head(attention_maps)[:, 0]
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
