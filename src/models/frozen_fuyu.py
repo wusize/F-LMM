@@ -243,7 +243,7 @@ class FrozenFuyuSAM(FrozenFuyu):
                                 output_hidden_states=True,
                                 output_attentions=True)
         tok = time()
-        if tok - tik > 0.01:
+        if tok - tik > 1.0:
             print(f"Fuyu forward time: {tok - tik}. Device: {input_ids.device}, {input_ids.shape}",
                   flush=True)
 
@@ -281,7 +281,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         tik = time()
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         tok = time()
-        if tok - tik > 0.01:
+        if tok - tik > 1.0:
             print(f"Mask forward time: {tok - tik}. Device: {mask_attentions.device}, {mask_attentions.shape}",
                   flush=True)
         # todo: unpad pred_masks
@@ -298,7 +298,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         tik = time()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
         tok = time()
-        if tok - tik > 0.01:
+        if tok - tik > 1.0:
             print(f"SAM forward time: {tok - tik}. Device: {pred_masks.device}, {pred_masks.shape}",
                   flush=True)
 
