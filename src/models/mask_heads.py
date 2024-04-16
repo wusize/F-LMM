@@ -121,7 +121,8 @@ class UNetHead(UNet):
         padded_x = x.new_zeros(*x.shape[:2], padded_h, padded_w)
         padded_x[..., :h, :w] = x
         tik = time()
-        x = super().forward(padded_x)[-1][..., :h, :w]
+        # x = super().forward(padded_x)[-1][..., :h, :w]
+        x = self.timed_forward(padded_x)[-1][..., :h, :w]
         tok = time()
         if tok - tik > 0.1:
             print(f"Unet forward: {tok - tik}. Device: {x.device}, {x.shape}")
