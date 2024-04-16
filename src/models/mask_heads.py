@@ -8,8 +8,6 @@ from mmseg.models import UNet
 from mmseg.models.utils.wrappers import Upsample, resize
 from mmengine.logging import print_log
 
-from time import time
-
 
 class FCNHead(nn.Module):
     """Fully Convolution Networks for Semantic Segmentation.
@@ -106,13 +104,9 @@ class UNetHead(UNet):
     def forward(self, x):
         h, w = x.shape[-2:]
         if self.upsample_input is not None:
-            tik = time()
             scale_factor = max(1.0, self.upsample_input / max(h, w))
             x = F.interpolate(x.float(), scale_factor=scale_factor, mode='bilinear').to(x)
             h, w = x.shape[-2:]   # upsample the low-res input to get better results
-            tok = time()
-            if tok - tik > 0.1:
-                print(f"Interpolate mask attentions: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
 
         dividend = 2**(self.num_stages - 1)
         padded_h = math.ceil(h / dividend) * dividend
@@ -120,45 +114,8 @@ class UNetHead(UNet):
 
         padded_x = x.new_zeros(*x.shape[:2], padded_h, padded_w)
         padded_x[..., :h, :w] = x
-        tik = time()
-        # x = super().forward(padded_x)[-1][..., :h, :w]
-        x = self.timed_forward(padded_x)[-1][..., :h, :w]
-        tok = time()
-        if tok - tik > 0.1:
-            print(f"Unet forward: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
-        tik = time()
-        masks = self.conv_seg(x)
-        tok = time()
-        if tok - tik > 0.1:
-            print(f"Segment: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
-
-        return masks
-
-    def timed_forward(self, x):
-        tik = time()
-        self._check_input_divisible(x)
-        tok = time()
-        if tok - tik > 0.1:
-            print(f"Check divisibility: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
-        enc_outs = []
-        tik = time()
-        for enc in self.encoder:
-            x = enc(x)
-            enc_outs.append(x)
-        tok = time()
-        if tok - tik > 0.1:
-            print(f"Encoder forward: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
-
-        tik = time()
-        dec_outs = [x]
-        for i in reversed(range(len(self.decoder))):
-            x = self.decoder[i](enc_outs[i], x)
-            dec_outs.append(x)
-        tok = time()
-        if tok - tik > 0.1:
-            print(f"Decoder forward: {tok - tik}. Device: {x.device}, {x.shape}", flush=True)
-
-        return dec_outs
+        x = super().forward(padded_x)[-1][..., :h, :w]
+        return self.conv_seg(x)
 
 
 if __name__ == '__main__':

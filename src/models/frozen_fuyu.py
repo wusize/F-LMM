@@ -198,9 +198,6 @@ class FrozenFuyu(BaseModel):
         return image_patches.to(self.fuyu.dtype), image_patches_indices, image_token_ids
 
 
-from time import time
-
-
 class FrozenFuyuSAM(FrozenFuyu):
     def __init__(self,
                  sam,
@@ -235,7 +232,6 @@ class FrozenFuyuSAM(FrozenFuyu):
         attention_mask = torch.ones_like(input_ids)
 
         meta_data = data_sample['meta_data']
-        tik = time()
         with torch.no_grad():
             outputs = self.fuyu(input_ids=input_ids,
                                 image_patches=image_patches,
@@ -244,10 +240,6 @@ class FrozenFuyuSAM(FrozenFuyu):
                                 output_hidden_states=True,
                                 output_attentions=True,
                                 use_cache=False)
-        tok = time()
-        if tok - tik > 1.0:
-            print(f"Fuyu forward time: {tok - tik}. Device: {input_ids.device}, {input_ids.shape}",
-                  flush=True)
 
         attentions = [attn[0, ..., image_patches_indices[0] >= 0]
                       for attn in outputs.attentions]
@@ -277,15 +269,9 @@ class FrozenFuyuSAM(FrozenFuyu):
         del attentions, hidden_states
 
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-        # if self.training:
-        #     mask_attentions.requires_grad = True
-        # import pdb; pdb.set_trace()
-        tik = time()
+        if self.training:
+            mask_attentions.requires_grad = True
         pred_masks = self.mask_head(mask_attentions)[:, 0]
-        tok = time()
-        if tok - tik > 1.0:
-            print(f"Mask forward time: {tok - tik}. Device: {mask_attentions.device}, {mask_attentions.shape}",
-                  flush=True)
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
 
@@ -297,12 +283,7 @@ class FrozenFuyuSAM(FrozenFuyu):
 
         pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w].contiguous()
 
-        tik = time()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
-        tok = time()
-        if tok - tik > 1.0:
-            print(f"SAM forward time: {tok - tik}. Device: {pred_masks.device}, {pred_masks.shape}",
-                  flush=True)
 
         return pred_masks, sam_pred_masks
 
