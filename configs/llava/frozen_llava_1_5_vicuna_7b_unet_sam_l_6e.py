@@ -5,16 +5,18 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
 from torch.nn import GroupNorm
-from transformers import AutoTokenizer, FuyuForCausalLM
+from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
 from mmengine.dataset import DefaultSampler
 from src.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
                               concat_datasets, gcg_collate_fn)
 # from src.datasets.png import PNGDataset
-from src.datasets.fuyu_processors import CustomFuyuImageProcessor
-from src.models.frozen_fuyu import FrozenFuyuSAM
+from src.models.llava.modeling_llava import CustomLlavaForConditionalGeneration
+from src.datasets.llava_processors import CustomLlavaImageProcessor
+from src.models.frozen_llava import FrozenLlavaSAM
 from src.models.mask_heads import UNetHead
+from xtuner.utils.templates import PROMPT_TEMPLATE
 from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
@@ -27,7 +29,7 @@ from mmseg.models.backbones.unet import InterpConv
 batch_size = 1  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
-max_epochs = 1
+max_epochs = 6
 optim_type = AdamW
 lr = 1e-4
 betas = (0.9, 0.999)
@@ -45,12 +47,8 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 # Model
-prompt_template = dict(
-    SYSTEM='',
-    INSTRUCTION='{input}\n\x04',
-    SEP='\n')
-prompt = 'What is shown in this image?'
-fuyu_name = 'adept/fuyu-8b'
+prompt_template = PROMPT_TEMPLATE.vicuna
+llava_name = 'llava-hf/llava-1.5-7b-hf'
 unet = dict(type=UNetHead,
             upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
             in_channels=2048,
@@ -76,24 +74,20 @@ unet = dict(type=UNetHead,
 
 tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
-    pretrained_model_name_or_path=fuyu_name,
-    bos_token="<s>", padding_side='right', pad_token='|ENDOFTEXT|')
-
+    pretrained_model_name_or_path=llava_name)
 image_processor = dict(
-    type=CustomFuyuImageProcessor.from_pretrained,
-    pretrained_model_name_or_path=fuyu_name,
-    size={'height': 320, 'width': 320})
+    type=CustomLlavaImageProcessor.from_pretrained,
+    pretrained_model_name_or_path='openai/clip-vit-large-patch14-336')
 
 model = dict(
-    type=FrozenFuyuSAM,
+    type=FrozenLlavaSAM,
     sam=dict(type=SAMWrapper,
              use_text=True, use_mask=True, multimask_output=False,
              model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
-    model=dict(type=FuyuForCausalLM.from_pretrained,
-               pretrained_model_name_or_path=fuyu_name,
+    model=dict(type=CustomLlavaForConditionalGeneration.from_pretrained,
+               pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),
     mask_head=unet,
-    tokenizer=tokenizer,
     loss_mask=dict(
         type=CrossEntropyLoss,
         use_sigmoid=True,
@@ -120,32 +114,28 @@ datasets_list = [
          local_path='data/GranDf_HA_images/train',
          prompt_template=prompt_template,
          tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt=prompt),
+         image_processor=image_processor),
     dict(type=GCGDataset,
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
          json_file='data/OpenPsgGCG_train.json',
          local_path='data/coco',
          prompt_template=prompt_template,
          tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt=prompt),
+         image_processor=image_processor),
     dict(type=RefCOCOGForGCGDataset,
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
          json_file='data/RefCOCOg_GCG_train.json',
          local_path='data/coco/train2014',
          prompt_template=prompt_template,
          tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt=prompt),
+         image_processor=image_processor),
     dict(type=FlickrForGCGDataset,
          ceph_path='BJ17:S3://wusize/flickr/train',
          json_file='data/flickr_mergedGT_GCG_train.json',
          local_path='data/flickr/train',
          prompt_template=prompt_template,
          tokenizer=tokenizer,
-         image_processor=image_processor,
-         prompt=prompt),
+         image_processor=image_processor),
     # dict(type=PNGDataset,
     #      json_file='data/png_coco_train2017.json',
     #      panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
@@ -154,9 +144,7 @@ datasets_list = [
     #      image_processor=image_processor,
     #      prompt_template=prompt_template,
     #      local_path='data/coco/train2017',
-    #      ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
-    #      prompt=prompt
-    #      )
+    #      ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
 ]
 
 train_dataloader = dict(
