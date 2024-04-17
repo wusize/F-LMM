@@ -59,7 +59,8 @@ class KeyPhraseHead(nn.Module):
         query_pos = positional_encoding_1d(
             self.embed_dim, seq_len+self.max_num).to(device=self.device, dtype=self.dtype)
 
-        query = self.encoder(query=query[None], query_pos=query_pos[None])[0]
+        query = self.encoder(query=query[None], query_pos=query_pos[None],
+                             key_padding_mask=None)[0]
         query = self.out_proj(query)
         logits = query[-self.max_num:] @ query[:seq_len].T
         if labels is None:
