@@ -46,8 +46,6 @@ class FrozenFuyu(BaseModel):
         key_phrase_head.update(in_channels=self.fuyu.config.hidden_size)
         self.key_phrase_head = BUILDER.build(key_phrase_head)
 
-        assert self.sam.model.prompt_encoder.embed_dim == self.key_phrase_head.embed_dim
-
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
 

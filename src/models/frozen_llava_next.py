@@ -41,7 +41,6 @@ class FrozenLlavaNext(BaseModel):
             torch.ones(self.llava.config.text_config.num_hidden_layers))
         key_phrase_head.update(in_channels=self.llava.config.text_config.hidden_size)
         self.key_phrase_head = BUILDER.build(key_phrase_head)
-        assert self.sam.model.prompt_encoder.embed_dim == self.key_phrase_head.embed_dim
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)

@@ -67,9 +67,6 @@ class KeyPhraseHead(nn.Module):
 
 
 
-        for layer in self.layers:
-            q = layer(query=q[None], key=q[None], value=q[None])[0]
-
         key_phrase_queries = F.normalize(q[seq_len:], dim=-1)
         text_seq_queries = F.normalize(q[:seq_len], dim=-1)
         logits = self.get_temperature() * key_phrase_queries @ text_seq_queries
