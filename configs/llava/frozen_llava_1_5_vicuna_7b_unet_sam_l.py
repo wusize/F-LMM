@@ -4,7 +4,7 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
-from torch.nn import GroupNorm
+from torch.nn import GroupNorm, ReLU
 from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
@@ -97,6 +97,20 @@ model = dict(
     loss_mask=loss_mask,
     loss_dice=loss_dice,
     key_phrase_head=dict(type=KeyPhraseHead,
+                         encoder=dict(  # DetrTransformerEncoder
+                             num_layers=3,
+                             layer_cfg=dict(  # DetrTransformerEncoderLayer
+                                 self_attn_cfg=dict(  # MultiheadAttention
+                                     embed_dims=256,
+                                     num_heads=8,
+                                     dropout=0.1,
+                                     batch_first=True),
+                                 ffn_cfg=dict(
+                                     embed_dims=256,
+                                     feedforward_channels=2048,
+                                     num_fcs=2,
+                                     ffn_drop=0.1,
+                                     act_cfg=dict(type=ReLU, inplace=True)))),
                          loss_mask=loss_mask,
                          loss_dice=loss_dice)
 )

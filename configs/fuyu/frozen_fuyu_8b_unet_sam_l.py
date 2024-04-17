@@ -104,15 +104,10 @@ model = dict(
     loss_mask=loss_mask,
     loss_dice=loss_dice,
     key_phrase_head=dict(type=KeyPhraseHead,
-                         decoder=dict(  # DetrTransformerDecoder
-                             num_layers=3,    # we only use 3 layers
-                             layer_cfg=dict(  # DetrTransformerDecoderLayer
+                         encoder=dict(  # DetrTransformerEncoder
+                             num_layers=3,
+                             layer_cfg=dict(  # DetrTransformerEncoderLayer
                                  self_attn_cfg=dict(  # MultiheadAttention
-                                     embed_dims=256,
-                                     num_heads=8,
-                                     dropout=0.1,
-                                     batch_first=True),
-                                 cross_attn_cfg=dict(  # MultiheadAttention
                                      embed_dims=256,
                                      num_heads=8,
                                      dropout=0.1,
@@ -122,8 +117,7 @@ model = dict(
                                      feedforward_channels=2048,
                                      num_fcs=2,
                                      ffn_drop=0.1,
-                                     act_cfg=dict(type=ReLU, inplace=True))),
-                             return_intermediate=False),
+                                     act_cfg=dict(type=ReLU, inplace=True)))),
                          loss_mask=loss_mask,
                          loss_dice=loss_dice)
 )

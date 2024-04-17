@@ -1,10 +1,9 @@
 import math
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 from xtuner.registry import BUILDER
-from mmdet.models import DetrTransformerDecoder
+from mmdet.models import DetrTransformerEncoder
 
 
 def positional_encoding_1d(d_model, length):
@@ -29,47 +28,37 @@ def positional_encoding_1d(d_model, length):
 class KeyPhraseHead(nn.Module):
     def __init__(self,
                  max_num=50,
-                 temp=10.0,
                  in_channels=256,
-                 decoder=None,
+                 encoder=None,
                  loss_mask=None,
                  loss_dice=None):
         super(KeyPhraseHead, self).__init__()
-        self.decoder = DetrTransformerDecoder(**decoder)
-        embed_dim = self.decoder.embed_dims
+        self.encoder = DetrTransformerEncoder(**encoder)
+        embed_dim = self.encoder.embed_dims
         self.key_phrase_queries = nn.Parameter(torch.randn(max_num, embed_dim))
         self.max_num = max_num
         self.embed_dim = embed_dim
-        self.temp = nn.Parameter(torch.tensor(temp))
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
         self.in_proj = nn.Linear(in_channels, embed_dim)
+        self.out_proj = nn.Linear(embed_dim, embed_dim)
         self._init_weights()
 
     def _init_weights(self):
-        for p in self.decoder.parameters():
+        for p in self.encoder.parameters():
             if p.dim() > 1:
                 nn.init.xavier_uniform_(p)
-
-    def get_temperature(self):
-        return self.temp.clamp(min=1.0)
 
     def forward(self, hidden_states, labels=None):
         hidden_states = self.in_proj(hidden_states.detach())    # detach to make it an independent branch
         seq_len, _ = hidden_states.shape
+        query = torch.cat([hidden_states, self.key_phrase_queries], dim=0)
+        query_pos = positional_encoding_1d(
+            self.embed_dim, seq_len+self.max_num).to(device=self.device, dtype=self.dtype)
 
-        query = torch.zeros_like(self.key_phrase_queries)
-        key = hidden_states
-        value = hidden_states
-        query_pos = self.key_phrase_queries
-        key_pos = positional_encoding_1d(self.embed_dim, seq_len).to(device=self.device,
-                                                                     dtype=self.dtype)
-
-
-
-        key_phrase_queries = F.normalize(q[seq_len:], dim=-1)
-        text_seq_queries = F.normalize(q[:seq_len], dim=-1)
-        logits = self.get_temperature() * key_phrase_queries @ text_seq_queries
+        query = self.encoder(query=query[None], query_pos=query_pos[None])[0]
+        query = self.out_proj(query)
+        logits = query[-self.max_num:] @ query[:seq_len].T
         if labels is None:
             pred_masks = logits > 0.0
             pred_masks = pred_masks[pred_masks.sum(dim=-1) > 0]
@@ -83,11 +72,11 @@ class KeyPhraseHead(nn.Module):
 
     @property
     def dtype(self):
-        return self.temp.dtype
+        return self.key_phrase_queries.dtype
 
     @property
     def device(self):
-        return self.temp.device
+        return self.key_phrase_queries.device
 
     def loss(self, logits, gt_masks):
         with torch.no_grad():
@@ -113,6 +102,7 @@ class KeyPhraseHead(nn.Module):
         pos_pred = torch.zeros(len(logits), device=self.device, dtype=torch.bool)
         pos_pred[col_ids.tolist()] = True
         neg_logits = logits[torch.logical_not(pos_pred)]
+        assert len(neg_logits) + len(pos_logits) == len(logits)
         neg_gt_masks = torch.zeros(len(neg_logits), device=self.device, dtype=self.dtype)
         if len(neg_logits) > 0:
             loss_mask_neg = self.loss_mask(neg_logits.view(-1), neg_gt_masks.view(-1),
