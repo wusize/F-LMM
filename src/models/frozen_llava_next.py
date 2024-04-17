@@ -89,7 +89,7 @@ class FrozenLlavaNext(BaseModel):
                                  output_hidden_states=True,
                                  output_attentions=True)
         fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
-        mask_ids = outputs['mask_ids']
+        mask_ids = outputs['mask_ids'][0]
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
@@ -118,7 +118,7 @@ class FrozenLlavaNext(BaseModel):
         attentions_with_coarse_list = []
         attentions_with_fine_list = []
         for mask_id in range(len(masks)):
-            matched = mask_ids[0] == mask_id
+            matched = mask_ids == mask_id
             assert matched.sum() > 0
 
             mask_attentions_with_coarse = torch.cat(
@@ -234,7 +234,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                                  output_hidden_states=True,
                                  output_attentions=True)
         fine_image_feature_h, fine_image_feature_w = outputs['image_feature_shapes'][0]
-        mask_ids = outputs['mask_ids']
+        mask_ids = outputs['mask_ids'][0]
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
@@ -264,7 +264,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         attentions_with_fine_list = []
         text_embeds = []
         for mask_id in range(len(masks)):
-            matched = mask_ids[0] == mask_id
+            matched = mask_ids == mask_id
             assert matched.sum() > 0
 
             mask_attentions_with_coarse = torch.cat(

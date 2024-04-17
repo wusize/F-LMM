@@ -89,7 +89,7 @@ class FrozenLlava(BaseModel):
                                  attention_mask=attention_mask,
                                  output_hidden_states=True,
                                  output_attentions=True)
-        mask_ids = outputs['mask_ids']
+        mask_ids = outputs['mask_ids'][0]
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
@@ -108,7 +108,7 @@ class FrozenLlava(BaseModel):
         masks = data_sample['masks']
         mask_attentions = []
         for mask_id in range(len(masks)):
-            matched = mask_ids[0] == mask_id
+            matched = mask_ids == mask_id
             assert matched.sum() > 0
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
@@ -228,7 +228,7 @@ class FrozenLlavaSAM(FrozenLlava):
                                  attention_mask=attention_mask,
                                  output_hidden_states=True,
                                  output_attentions=True)
-        mask_ids = outputs['mask_ids']
+        mask_ids = outputs['mask_ids'][0]
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
@@ -248,7 +248,7 @@ class FrozenLlavaSAM(FrozenLlava):
         mask_attentions = []
         text_embeds = []
         for mask_id in range(len(masks)):
-            matched = mask_ids[0] == mask_id
+            matched = mask_ids == mask_id
             assert matched.sum() > 0
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
@@ -329,7 +329,6 @@ class FrozenLlavaSAM(FrozenLlava):
             losses_dice_phrase.append(loss_dice_phrase)
             losses_mask_phrase.append(loss_mask_phrase)
             aious_phrase.append(aiou_phrase)
-
 
         assert mask_cnts > 0
 
