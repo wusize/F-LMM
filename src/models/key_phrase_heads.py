@@ -51,7 +51,6 @@ class KeyPhraseHead(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, hidden_states, labels=None):
-        import pdb; pdb.set_trace()
         if self.detach:
             hidden_states = hidden_states.detach()
         hidden_states = self.in_proj(hidden_states)
@@ -84,7 +83,6 @@ class KeyPhraseHead(nn.Module):
         return self.key_phrase_queries.device
 
     def loss(self, logits, gt_masks):
-        import pdb; pdb.set_trace()
         with torch.no_grad():
             pred_masks = (logits > 0.0).to(self.dtype)
             mask_prod = gt_masks[:, None] * pred_masks[None]   # num_gt, num_pred, seq_len
@@ -109,7 +107,7 @@ class KeyPhraseHead(nn.Module):
         pos_pred[col_ids.tolist()] = True
         neg_logits = logits[torch.logical_not(pos_pred)]
         assert len(neg_logits) + len(pos_logits) == len(logits)
-        neg_gt_masks = torch.zeros(len(neg_logits), device=self.device, dtype=self.dtype)
+        neg_gt_masks = torch.zeros_like(neg_logits)
         if len(neg_logits) > 0:
             loss_mask_neg = self.loss_mask(neg_logits.view(-1), neg_gt_masks.view(-1),
                                            avg_factor=neg_logits.numel())
