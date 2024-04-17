@@ -4,7 +4,7 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
-from torch.nn import GroupNorm
+from torch.nn import GroupNorm, ReLU
 from transformers import AutoTokenizer, FuyuForCausalLM
 from xtuner.engine.runner import TrainLoop
 
@@ -18,6 +18,7 @@ from src.models.mask_heads import UNetHead
 from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
+from src.models.key_phrase_heads import KeyPhraseHead
 
 #######################################################################
 #                          PART 1  Settings                           #
@@ -65,14 +66,20 @@ unet = dict(type=UNetHead,
             norm_cfg=dict(type=GroupNorm, num_groups=1),
             upsample_cfg=dict(type=InterpConv)
             )
-# fcn = dict(type=FCNHead,
-#            num_convs=4,
-#            kernel_size=3,
-#            in_channels=2048,
-#            channels=256,
-#            concat_input=True,
-#            norm_cfg=dict(type=GroupNorm, num_groups=1),
-#            )
+
+loss_mask = dict(
+    type=CrossEntropyLoss,
+    use_sigmoid=True,
+    reduction='mean',
+    loss_weight=1.0)
+loss_dice = dict(
+    type=DiceLoss,
+    use_sigmoid=True,
+    activate=True,
+    reduction='mean',
+    naive_dice=True,
+    eps=1.0,
+    loss_weight=1.0)
 
 tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
@@ -94,19 +101,31 @@ model = dict(
                torch_dtype=torch.float16, low_cpu_mem_usage=True),
     mask_head=unet,
     tokenizer=tokenizer,
-    loss_mask=dict(
-        type=CrossEntropyLoss,
-        use_sigmoid=True,
-        reduction='mean',
-        loss_weight=1.0),
-    loss_dice=dict(
-        type=DiceLoss,
-        use_sigmoid=True,
-        activate=True,
-        reduction='mean',
-        naive_dice=True,
-        eps=1.0,
-        loss_weight=1.0)
+    loss_mask=loss_mask,
+    loss_dice=loss_dice,
+    key_phrase_head=dict(type=KeyPhraseHead,
+                         decoder=dict(  # DetrTransformerDecoder
+                             num_layers=3,    # we only use 3 layers
+                             layer_cfg=dict(  # DetrTransformerDecoderLayer
+                                 self_attn_cfg=dict(  # MultiheadAttention
+                                     embed_dims=256,
+                                     num_heads=8,
+                                     dropout=0.1,
+                                     batch_first=True),
+                                 cross_attn_cfg=dict(  # MultiheadAttention
+                                     embed_dims=256,
+                                     num_heads=8,
+                                     dropout=0.1,
+                                     batch_first=True),
+                                 ffn_cfg=dict(
+                                     embed_dims=256,
+                                     feedforward_channels=2048,
+                                     num_fcs=2,
+                                     ffn_drop=0.1,
+                                     act_cfg=dict(type=ReLU, inplace=True))),
+                             return_intermediate=False),
+                         loss_mask=loss_mask,
+                         loss_dice=loss_dice)
 )
 
 #######################################################################

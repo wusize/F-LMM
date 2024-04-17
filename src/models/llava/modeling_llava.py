@@ -57,6 +57,7 @@ class LlavaCausalLMOutputWithPast(ModelOutput):
     image_hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     image_to_overwrite: Optional[Tuple[torch.BoolTensor]] = None
     mask_ids: Optional[Tuple[torch.LongTensor]] = None
+    labels: Optional[Tuple[torch.LongTensor]] = None
 
 
 @add_start_docstrings(
@@ -289,20 +290,20 @@ class CustomLlavaForConditionalGeneration(LlavaForConditionalGeneration):
         logits = outputs[0]
 
         loss = None
-        if labels is not None:
-            # Shift so that tokens < n predict n
-            if attention_mask is not None:
-                shift_attention_mask = attention_mask[..., 1:]
-                shift_logits = logits[..., :-1, :][shift_attention_mask.to(logits.device) != 0].contiguous()
-                shift_labels = labels[..., 1:][shift_attention_mask.to(labels.device) != 0].contiguous()
-            else:
-                shift_logits = logits[..., :-1, :].contiguous()
-                shift_labels = labels[..., 1:].contiguous()
-            # Flatten the tokens
-            loss_fct = nn.CrossEntropyLoss()
-            loss = loss_fct(
-                shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1).to(shift_logits.device)
-            )
+        # if labels is not None:
+        #     # Shift so that tokens < n predict n
+        #     if attention_mask is not None:
+        #         shift_attention_mask = attention_mask[..., 1:]
+        #         shift_logits = logits[..., :-1, :][shift_attention_mask.to(logits.device) != 0].contiguous()
+        #         shift_labels = labels[..., 1:][shift_attention_mask.to(labels.device) != 0].contiguous()
+        #     else:
+        #         shift_logits = logits[..., :-1, :].contiguous()
+        #         shift_labels = labels[..., 1:].contiguous()
+        #     # Flatten the tokens
+        #     loss_fct = nn.CrossEntropyLoss()
+        #     loss = loss_fct(
+        #         shift_logits.view(-1, shift_logits.size(-1)), shift_labels.view(-1).to(shift_logits.device)
+        #     )
 
         assert return_dict, "Use dict in our implementation"
 
@@ -318,4 +319,5 @@ class CustomLlavaForConditionalGeneration(LlavaForConditionalGeneration):
             attentions=outputs.attentions,
             image_to_overwrite=image_to_overwrite,
             mask_ids=mask_ids,
+            labels=labels,
         )

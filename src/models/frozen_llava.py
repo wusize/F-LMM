@@ -20,7 +20,8 @@ class FrozenLlava(BaseModel):
                  mask_head,
                  merge='mean',
                  loss_mask=None,
-                 loss_dice=None):
+                 loss_dice=None,
+                 key_phrase_head=None):
         super().__init__()
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
@@ -35,6 +36,17 @@ class FrozenLlava(BaseModel):
 
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
+
+        self.text_layer_weights = nn.Parameter(
+            torch.ones(self.llava.config.text_config.num_hidden_layers))
+        key_phrase_head.update(in_channels=self.llava.config.text_config.hidden_size)
+        self.key_phrase_head = BUILDER.build(key_phrase_head)
+        assert self.sam.model.prompt_encoder.embed_dim == self.key_phrase_head.embed_dim, \
+            f"{self.sam.model.prompt_encoder.embed_dim}"
+        
+    def get_text_layer_weights(self):
+        return torch.softmax(self.text_layer_weights, dim=0)
+
 
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
@@ -64,10 +76,12 @@ class FrozenLlava(BaseModel):
             raise NotImplementedError
 
     def _forward(self, data_sample):
+        text_layer_weights = self.get_text_layer_weights()
         inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
                       mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
                       pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
-                                                                        dtype=self.llava.dtype)
+                                                                        dtype=self.llava.dtype),
+                      labels=data_sample['labels'][None].to(self.llava.device)
                       )
         attention_mask = torch.ones(inputs['input_ids'].shape, device=self.llava.device,
                                     dtype=torch.bool)
@@ -75,20 +89,26 @@ class FrozenLlava(BaseModel):
         with torch.no_grad():
             outputs = self.llava(**inputs,
                                  attention_mask=attention_mask,
-                                 # output_hidden_states=True,
+                                 output_hidden_states=True,
                                  output_attentions=True)
         mask_ids = outputs['mask_ids']
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                       for attn in outputs.attentions]
+        hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+
+        labels = outputs.labels[0]
+
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
         del outputs
 
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        llava_h, llava_w = padded_h // self.patch_size,  padded_w // self.patch_size
+        llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
 
         attentions = [attn.view(*attn.shape[:-1], llava_h, llava_w) for attn in attentions]
         masks = data_sample['masks']
         mask_attentions = []
-
         for mask_id in range(len(masks)):
             matched = mask_ids[0] == mask_id
             assert matched.sum() > 0
@@ -111,7 +131,10 @@ class FrozenLlava(BaseModel):
 
         pred_masks = pred_masks[:, before_height:before_height+mask_h, before_width:before_width+mask_w].contiguous()
 
-        return pred_masks
+        output = dict(pred_masks=pred_masks,
+                      labels=labels, mask_ids=mask_ids, hidden_states=hidden_states)
+
+        return output
 
     def compute_loss(self, data):
         mask_cnts = 0
@@ -120,8 +143,14 @@ class FrozenLlava(BaseModel):
         accuracy = 0
         aiou = 0
 
+        losses_dice_phrase = []
+        losses_mask_phrase = []
+        aious_phrase = []
+
+
         for data_sample in data:
-            pred_masks = self._forward(data_sample)
+            forward_output = self._forward(data_sample)
+            pred_masks = forward_output['pred_masks']
             masks = data_sample['masks'].to(self.llava.device)
             gt_masks = F.interpolate(masks[None].float(),
                                      size=pred_masks.shape[-2:])[0].to(pred_masks)
@@ -135,11 +164,24 @@ class FrozenLlava(BaseModel):
             accuracy += accuracy_ * mask_cnt
             aiou += aiou_ * mask_cnt
 
+
+            labels, mask_ids, hidden_states = (forward_output['labels'],
+                                               forward_output['mask_ids'], forward_output['hidden_states'])
+            loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
+                hidden_states[labels>=0], mask_ids[labels>=0])
+            losses_dice_phrase.append(loss_dice_phrase)
+            losses_mask_phrase.append(loss_mask_phrase)
+            aious_phrase.append(aiou_phrase)
+
+
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
                      'loss_dice': loss_dice / mask_cnts,
                      'accuracy': accuracy / mask_cnts,
                      'aiou': aiou / mask_cnts,
+                     'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
+                     'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     'aiou_phrase': sum(aious_phrase) / len(data)
                      }
 
         return loss_dict
@@ -162,35 +204,23 @@ class FrozenLlava(BaseModel):
 
     @torch.no_grad()
     def predict(self, data_sample):
-        pred_masks = self._forward(data_sample)
-
-        return pred_masks
+        return self._forward(data_sample)['pred_masks']
 
 
 class FrozenLlavaSAM(FrozenLlava):
-    def __init__(self,
-                 sam,
-                 sam_weight=1.0,
-                 intermediate_weight=1.0,
-                 *args, **kwargs):
+    def __init__(self, sam, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sam = BUILDER.build(sam)
         self.text_proj = nn.Linear(self.llava.config.text_config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
-        self.text_layer_weights = nn.Parameter(
-            torch.ones(self.llava.config.text_config.num_hidden_layers))
-        self.sam_weight = sam_weight
-        self.intermediate_weight = intermediate_weight
-
-    def get_text_layer_weights(self):
-        return torch.softmax(self.text_layer_weights, dim=0)
 
     def _forward(self, data_sample):
         text_layer_weights = self.get_text_layer_weights()
         inputs = dict(input_ids=data_sample['input_ids'][None].to(self.llava.device),
                       mask_ids=data_sample['mask_ids'][None].to(self.llava.device),
                       pixel_values=data_sample['pixel_values'][None].to(device=self.llava.device,
-                                                                        dtype=self.llava.dtype)
+                                                                        dtype=self.llava.dtype),
+                      labels=data_sample['labels'][None].to(self.llava.device)
                       )
         attention_mask = torch.ones(inputs['input_ids'].shape, device=self.llava.device,
                                     dtype=torch.bool)
@@ -204,6 +234,12 @@ class FrozenLlavaSAM(FrozenLlava):
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+
+        labels = outputs.labels[0]
+
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
         del outputs
 
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
@@ -218,14 +254,9 @@ class FrozenLlavaSAM(FrozenLlava):
             assert matched.sum() > 0
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
+            text_embeds.append(self.text_proj(hidden_states[matched]))
 
-            # num_layers, matched_seq_len, hidden_size
-            matched_hidden_states = torch.stack([hs[0, matched] for hs in hidden_states])
-            matched_hidden_states *= text_layer_weights.view(-1, 1, 1)
-            # matched_seq_len, hidden_size
-            text_embeds.append(self.text_proj(matched_hidden_states.sum(0).to(self.sam.dtype)))
-
-        del attentions, hidden_states
+        del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         if self.training:
             mask_attentions.requires_grad = True
@@ -242,13 +273,14 @@ class FrozenLlavaSAM(FrozenLlava):
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
 
-        return pred_masks, sam_pred_masks
+        output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks,
+                      labels=labels, mask_ids=mask_ids, hidden_states=hidden_states)
+
+        return output
 
     @torch.no_grad()
     def predict(self, data_sample):
-        _, pred_masks = self._forward(data_sample)
-
-        return pred_masks
+        return self._forward(data_sample)['sam_pred_masks']
 
     def compute_loss(self, data):
         mask_cnts = 0
@@ -263,8 +295,13 @@ class FrozenLlavaSAM(FrozenLlava):
         sam_accuracy = 0
         sam_aiou = 0
 
+        losses_dice_phrase = []
+        losses_mask_phrase = []
+        aious_phrase = []
+
         for data_sample in data:
-            pred_masks, sam_pred_masks = self._forward(data_sample)
+            forward_output = self._forward(data_sample)
+            pred_masks, sam_pred_masks = forward_output['pred_masks'], forward_output['sam_pred_masks']
             masks = data_sample['masks'].to(self.llava.device)
             gt_masks = F.interpolate(masks[None].float(),
                                      size=pred_masks.shape[-2:])[0].to(pred_masks)
@@ -287,6 +324,16 @@ class FrozenLlavaSAM(FrozenLlava):
             sam_accuracy += sam_accuracy_ * mask_cnt
             sam_aiou += sam_aiou_ * mask_cnt
 
+
+            labels, mask_ids, hidden_states = (forward_output['labels'],
+                                               forward_output['mask_ids'], forward_output['hidden_states'])
+            loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
+                hidden_states[labels>=0], mask_ids[labels>=0])
+            losses_dice_phrase.append(loss_dice_phrase)
+            losses_mask_phrase.append(loss_mask_phrase)
+            aious_phrase.append(aiou_phrase)
+
+
         assert mask_cnts > 0
 
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
@@ -297,11 +344,9 @@ class FrozenLlavaSAM(FrozenLlava):
                      'sam_loss_dice': sam_loss_dice / mask_cnts,
                      'sam_accuracy': sam_accuracy / mask_cnts,
                      'sam_aiou': sam_aiou / mask_cnts,
+                     'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
+                     'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     'aiou_phrase': sum(aious_phrase) / len(data)
                      }
-        for k, v in loss_dict.items():
-            if 'sam_loss' in k:
-                loss_dict[k] *= self.sam_weight
-            elif 'loss' in k:
-                loss_dict[k] *= self.intermediate_weight
 
         return loss_dict

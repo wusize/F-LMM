@@ -21,6 +21,7 @@ from xtuner.utils.templates import PROMPT_TEMPLATE
 from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
+from src.models.key_phrase_heads import KeyPhraseHead
 
 #######################################################################
 #                          PART 1  Settings                           #
@@ -64,14 +65,19 @@ unet = dict(type=UNetHead,
             norm_cfg=dict(type=GroupNorm, num_groups=1),
             upsample_cfg=dict(type=InterpConv)
             )
-# fcn = dict(type=FCNHead,
-#            num_convs=4,
-#            kernel_size=3,
-#            in_channels=2048,
-#            channels=256,
-#            concat_input=True,
-#            norm_cfg=dict(type=GroupNorm, num_groups=1),
-#            )
+loss_mask = dict(
+    type=CrossEntropyLoss,
+    use_sigmoid=True,
+    reduction='mean',
+    loss_weight=1.0)
+loss_dice = dict(
+    type=DiceLoss,
+    use_sigmoid=True,
+    activate=True,
+    reduction='mean',
+    naive_dice=True,
+    eps=1.0,
+    loss_weight=1.0)
 
 tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
@@ -89,19 +95,11 @@ model = dict(
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.float16, low_cpu_mem_usage=True),
     mask_head=unet,
-    loss_mask=dict(
-        type=CrossEntropyLoss,
-        use_sigmoid=True,
-        reduction='mean',
-        loss_weight=1.0),
-    loss_dice=dict(
-        type=DiceLoss,
-        use_sigmoid=True,
-        activate=True,
-        reduction='mean',
-        naive_dice=True,
-        eps=1.0,
-        loss_weight=1.0)
+    loss_mask=loss_mask,
+    loss_dice=loss_dice,
+    key_phrase_head=dict(type=KeyPhraseHead,
+                         loss_mask=loss_mask,
+                         loss_dice=loss_dice)
 )
 
 #######################################################################

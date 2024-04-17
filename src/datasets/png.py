@@ -19,6 +19,7 @@ import mmcv
 import io
 from mmengine.fileio import get
 from panopticapi import utils
+from xtuner.utils.constants import IGNORE_INDEX
 
 
 class PNGDataset(Dataset):
@@ -146,6 +147,11 @@ class PNGDataset(Dataset):
         padded_masks[:, padding['before_height']:p_h-padding['after_height'],
                         padding['before_width']:p_w-padding['after_width']] = masks
 
+        # todo: add labels
+        prompt_len = len(self.prompt)
+        labels = torch.ones_like(input_ids) * IGNORE_INDEX
+        labels[prompt_len:] = input_ids[prompt_len:]
+
         return dict(input_ids=input_ids,
                     mask_ids=mask_ids,
                     pixel_values=pixel_values,
@@ -155,7 +161,8 @@ class PNGDataset(Dataset):
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
                     mask_infos=mask_infos,
                     image=image,
-                    meta_data=meta_data)
+                    meta_data=meta_data,
+                    labels=labels)
 
 
 if __name__ == '__main__':

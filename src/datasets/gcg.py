@@ -19,6 +19,7 @@ from xtuner.registry import BUILDER
 from typing import Dict, Sequence
 from tqdm import tqdm
 from torch.utils.data import ConcatDataset
+from xtuner.utils.constants import IGNORE_INDEX
 
 
 def concat_datasets(datasets_list):
@@ -143,6 +144,11 @@ class GCGDataset(Dataset):
         final_input_ids = torch.cat(final_input_ids)
         mask_ids = torch.tensor(mask_ids)
 
+        # todo: add labels
+        prompt_len = len(self.prompt)
+        labels = torch.ones_like(final_input_ids) * IGNORE_INDEX
+        labels[prompt_len:] = final_input_ids[prompt_len:]
+
         image = self.read_image(sample_data['file_name'])
         image_data = self.image_processor.preprocess(image)
 
@@ -168,7 +174,8 @@ class GCGDataset(Dataset):
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),   # only used for llava-next
                     image=image,
-                    meta_data=meta_data)
+                    meta_data=meta_data,
+                    labels=labels)
 
 
 class RefCOCOGForGCGDataset(GCGDataset):
@@ -220,6 +227,11 @@ class RefCOCOGForGCGDataset(GCGDataset):
         final_input_ids = torch.cat(final_input_ids)
         mask_ids = torch.tensor(mask_ids)
 
+        # todo: add labels
+        prompt_len = len(self.prompt)
+        labels = torch.ones_like(final_input_ids) * IGNORE_INDEX
+        labels[prompt_len:] = final_input_ids[prompt_len:]
+
         image = self.read_image(data_sample['img_file_name'])
         height, width = image.height, image.width
 
@@ -257,7 +269,8 @@ class RefCOCOGForGCGDataset(GCGDataset):
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
                     image=image,
-                    meta_data=meta_data)
+                    meta_data=meta_data,
+                    labels=labels)
 
 
 class FlickrForGCGDataset(GCGDataset):
@@ -342,6 +355,11 @@ class FlickrForGCGDataset(GCGDataset):
         final_input_ids = torch.cat(final_input_ids)
         mask_ids = torch.tensor(mask_ids)
 
+        # todo: add labels
+        prompt_len = len(self.prompt)
+        labels = torch.ones_like(final_input_ids) * IGNORE_INDEX
+        labels[prompt_len:] = final_input_ids[prompt_len:]
+
         image = self.read_image(sample_data['file_name'])
         image_data = self.image_processor.preprocess(image)
 
@@ -368,7 +386,8 @@ class FlickrForGCGDataset(GCGDataset):
                     masks=masks,   # shape is kept
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
                     image=image,
-                    meta_data=meta_data)
+                    meta_data=meta_data,
+                    labels=labels)
 
 
 # TODO: use MUSE dataset
