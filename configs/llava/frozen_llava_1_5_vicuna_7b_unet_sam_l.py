@@ -21,11 +21,12 @@ from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
 from src.models.key_phrase_heads import KeyPhraseHead
+from src.runner import CustomRunner
 
 #######################################################################
 #                          PART 1  Settings                           #
 #######################################################################
-
+runner_type = CustomRunner
 find_unused_parameters = True
 
 # Scheduler & Optimizer
