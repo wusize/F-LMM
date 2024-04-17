@@ -31,7 +31,7 @@ class KeyPhraseHead(nn.Module):
                  in_channels=256,
                  encoder=None,
                  loss_mask=None,
-                 loss_dice=None):
+                 loss_dice=None, detach=True):
         super(KeyPhraseHead, self).__init__()
         self.encoder = DetrTransformerEncoder(**encoder)
         embed_dim = self.encoder.embed_dims
@@ -42,6 +42,7 @@ class KeyPhraseHead(nn.Module):
         self.loss_dice = BUILDER.build(loss_dice)
         self.in_proj = nn.Linear(in_channels, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.detach = detach
         self._init_weights()
 
     def _init_weights(self):
@@ -50,7 +51,9 @@ class KeyPhraseHead(nn.Module):
                 nn.init.xavier_uniform_(p)
 
     def forward(self, hidden_states, labels=None):
-        hidden_states = self.in_proj(hidden_states.detach())    # detach to make it an independent branch
+        if self.detach:
+            hidden_states = hidden_states.detach()
+        hidden_states = self.in_proj(hidden_states)
         seq_len, _ = hidden_states.shape
         query = torch.cat([hidden_states, self.key_phrase_queries], dim=0)
         query_pos = positional_encoding_1d(

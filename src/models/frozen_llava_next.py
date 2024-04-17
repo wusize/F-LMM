@@ -340,11 +340,10 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             labels, mask_ids, hidden_states = (forward_output['labels'],
                                                forward_output['mask_ids'], forward_output['hidden_states'])
             loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
-                hidden_states[labels>=0], mask_ids[labels>=0])
+                hidden_states[labels >= 0], mask_ids[labels >= 0])
             losses_dice_phrase.append(loss_dice_phrase)
             losses_mask_phrase.append(loss_mask_phrase)
             aious_phrase.append(aiou_phrase)
-
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
