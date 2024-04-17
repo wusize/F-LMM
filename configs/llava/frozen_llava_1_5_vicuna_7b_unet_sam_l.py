@@ -26,6 +26,8 @@ from src.models.key_phrase_heads import KeyPhraseHead
 #                          PART 1  Settings                           #
 #######################################################################
 
+find_unused_parameters = True
+
 # Scheduler & Optimizer
 batch_size = 1  # per_device
 accumulative_counts = 1
