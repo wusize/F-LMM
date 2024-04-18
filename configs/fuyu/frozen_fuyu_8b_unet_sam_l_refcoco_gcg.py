@@ -37,7 +37,7 @@ find_unused_parameters = True
 batch_size = 1  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
-max_epochs = 1
+max_epochs = 8
 optim_type = AdamW
 lr = 1e-4
 betas = (0.9, 0.999)
@@ -59,7 +59,7 @@ prompt_template = dict(
     SYSTEM='',
     INSTRUCTION='{input}\n\x04',
     SEP='\n')
-prompt = 'What is shown in this image?'
+prompt = "Please give me a description of the image."
 fuyu_name = 'adept/fuyu-8b'
 unet = dict(type=UNetHead,
             upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)

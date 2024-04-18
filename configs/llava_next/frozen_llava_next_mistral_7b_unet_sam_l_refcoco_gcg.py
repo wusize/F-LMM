@@ -40,7 +40,7 @@ find_unused_parameters = True
 batch_size = 1  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
-max_epochs = 1
+max_epochs = 8
 optim_type = AdamW
 lr = 1e-4
 betas = (0.9, 0.999)
@@ -52,12 +52,11 @@ warmup_ratio = 0.03
 save_steps = 500
 save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 
-
-
 #######################################################################
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 # Model
+prompt = "<image>\nPlease give me a description of the image."
 prompt_template = PROMPT_TEMPLATE.mistral
 llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
 unet = dict(type=UNetHead,
@@ -146,6 +145,7 @@ refcoco_pipeline = [
             type=RefCOCO2PNG,
             image_processor=image_processor,
             tokenizer=tokenizer,
+            prompt=prompt,
             prompt_template=prompt_template)
     ]
 datasets_list = [
@@ -153,6 +153,7 @@ datasets_list = [
          ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
          json_file='data/GranDf_HA_GCG_train.json',
          local_path='data/GranDf_HA_images/train',
+         prompt=prompt,
          prompt_template=prompt_template,
          tokenizer=tokenizer,
          image_processor=image_processor),
@@ -160,6 +161,7 @@ datasets_list = [
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
          json_file='data/OpenPsgGCG_train.json',
          local_path='data/coco',
+         prompt=prompt,
          prompt_template=prompt_template,
          tokenizer=tokenizer,
          image_processor=image_processor),
@@ -167,6 +169,7 @@ datasets_list = [
          ceph_path='BJ17:S3://wusize/flickr/train',
          json_file='data/flickr_mergedGT_GCG_train.json',
          local_path='data/flickr/train',
+         prompt=prompt,
          prompt_template=prompt_template,
          tokenizer=tokenizer,
          image_processor=image_processor),
