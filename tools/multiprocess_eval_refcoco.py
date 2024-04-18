@@ -106,7 +106,7 @@ if __name__ == '__main__':
         refcoco_subsets = refcoco_subsets['refcoco_val']
 
 
-    for name, subset in refcoco_subsets:
+    for name, subset in refcoco_subsets.items():
         accelerator.print(f"Start evaluating {name}")
         dataset = RefCocoDataset(
             data_root='data/coco/',
