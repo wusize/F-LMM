@@ -9,8 +9,19 @@ from xtuner.utils.constants import IGNORE_INDEX
 import torch
 import torch.nn.functional as F
 
+try:
+    from petrel_client.client import Client
+except:
+    Client = None
+
 
 class PILLoadImageFromFile(LoadImageFromFile):
+    def __init__(self, **kwargs):
+        backend_args = kwargs.pop('backend_args', None)
+        if Client is None:
+            backend_args = None
+        super().__init__(backend_args=backend_args, **kwargs)
+
     def transform(self, results: dict) -> Optional[dict]:
         """Functions to load image.
 

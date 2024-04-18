@@ -135,15 +135,12 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
-try:
-    from petrel_client.client import Client
-    backend_args = dict(
-        backend='petrel',
-        path_mapping=dict({
-            'data/coco/train2014/': 'openmmlab:s3://openmmlab/datasets/detection/coco/train2014/'})
-    )
-except:
-    backend_args = None
+
+backend_args = dict(
+    backend='petrel',
+    path_mapping=dict({
+        'data/coco/train2014/': 'openmmlab:s3://openmmlab/datasets/detection/coco/train2014/'})
+)
 refcoco_pipeline = [
         dict(type=PILLoadImageFromFile, backend_args=backend_args),
         dict(
