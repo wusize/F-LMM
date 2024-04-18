@@ -102,9 +102,6 @@ if __name__ == '__main__':
             ann_file='refcocog/instances.json',
             split_file='refcocog/refs(umd).p',
             split=split)
-    if args.debug:
-        refcoco_subsets = refcoco_subsets['refcoco_val']
-
 
     for name, subset in refcoco_subsets.items():
         accelerator.print(f"Start evaluating {name}")
