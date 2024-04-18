@@ -103,7 +103,7 @@ if __name__ == '__main__':
             split_file='refcocog/refs(umd).p',
             split=split)
     if args.debug:
-        refcoco_subsets = refcoco_subsets[:1]
+        refcoco_subsets = refcoco_subsets['refcoco_val']
 
 
     for name, subset in refcoco_subsets:
