@@ -100,7 +100,7 @@ model = dict(
              model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
     model=dict(type=FuyuForCausalLM.from_pretrained,
                pretrained_model_name_or_path=fuyu_name,
-               torch_dtype=torch.float16, low_cpu_mem_usage=True),
+               torch_dtype=torch.bfloat16, low_cpu_mem_usage=True),
     mask_head=unet,
     tokenizer=tokenizer,
     loss_mask=loss_mask,
