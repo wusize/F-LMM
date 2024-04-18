@@ -132,7 +132,7 @@ if __name__ == '__main__':
                                            size=gt_masks.shape[-2:], mode='bilinear')[0].cpu()
                 pred_masks = pred_masks > 0.5
 
-                assert len([pred_masks]) == len(gt_masks)
+                assert len(pred_masks) == len(gt_masks)
                 mask_cnt = pred_masks.shape[0]
 
                 # Formulate the output into the format that the evaluator accepts
