@@ -85,6 +85,8 @@ if __name__ == '__main__':
     prompt_template = cfg.prompt_template
     tokenizer = cfg.tokenizer
     image_processor = cfg.image_processor
+    prompt = cfg.get('prompt', None)
+
     print(f'Device: {accelerator.device}', flush=True)
     model = BUILDER.build(cfg.model)
     if args.checkpoint is not None:
@@ -94,15 +96,17 @@ if __name__ == '__main__':
     model = model.to(device=accelerator.device)
     model.eval()
 
-    png_dataset = PNGDataset(json_file='data/png_coco_val2017.json',
-                             panoptic_json_file='data/coco/annotations/panoptic_val2017.json',
-                             panoptic_png_path='data/coco/panoptic_val2017',
-                             tokenizer=tokenizer,
-                             image_processor=image_processor,
-                             prompt_template=prompt_template,
-                             local_path='data/coco/val2017',
-                             ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/val2017',
-                             )
+    dataset_params = dict(json_file='data/png_coco_val2017.json',
+                          panoptic_json_file='data/coco/annotations/panoptic_val2017.json',
+                          panoptic_png_path='data/coco/panoptic_val2017',
+                          tokenizer=tokenizer,
+                          image_processor=image_processor,
+                          prompt_template=prompt_template,
+                          local_path='data/coco/val2017',
+                          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/val2017',)
+    if prompt is not None:
+        dataset_params.update(prompt=prompt)
+    png_dataset = PNGDataset(**dataset_params)
 
     mask_ious = []
     isthing = []

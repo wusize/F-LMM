@@ -1,8 +1,9 @@
 from mmdet.datasets import RefCocoDataset
-from mmcv.transforms import LoadImageFromFile
+from src.datasets.transforms import PILLoadImageFromFile as LoadImageFromFile
 from mmengine.dataset.sampler import DefaultSampler
 from mmdet.datasets.transforms import (LoadAnnotations, PackDetInputs, Resize)
 from mmdet.evaluation import RefSegMetric
+from mmdet.datasets import RefCocoDataset
 
 dataset_type = RefCocoDataset
 data_root = 'data/coco/'
@@ -18,10 +19,10 @@ test_pipeline = [
         with_bbox=False,
         with_seg=False,
         with_label=False),
-    dict(
-        type=PackDetInputs,
-        meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
-                   'scale_factor', 'gt_masks', 'text'))
+    # dict(
+    #     type=PackDetInputs,
+    #     meta_keys=('img_id', 'img_path', 'ori_shape', 'img_shape',
+    #                'scale_factor', 'gt_masks', 'text'))
 ]
 
 val_dataloader = dict(
