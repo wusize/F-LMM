@@ -3,6 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
+from xtuner.model.utils import guess_load_checkpoint
 
 
 @torch.no_grad()
@@ -21,6 +22,7 @@ class FrozenLlavaNext(BaseModel):
                  merge='mean',
                  loss_mask=None,
                  loss_dice=None,
+                 pretrained=None,
                  key_phrase_head=None):
         super().__init__()
         self.llava = BUILDER.build(model)
@@ -41,6 +43,9 @@ class FrozenLlavaNext(BaseModel):
             torch.ones(self.llava.config.text_config.num_hidden_layers))
         key_phrase_head.update(in_channels=self.llava.config.text_config.hidden_size)
         self.key_phrase_head = BUILDER.build(key_phrase_head)
+
+        if pretrained is not None:
+            _ = self.load_state_dict(guess_load_checkpoint(pretrained), strict=False)
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
@@ -313,10 +318,13 @@ class FrozenLlavaNext(BaseModel):
 
 class FrozenLlavaNextSAM(FrozenLlavaNext):
     def __init__(self, sam, *args, **kwargs):
+        pretrained = kwargs.pop('pretrained', None)
         super().__init__(*args, **kwargs)
         self.sam = BUILDER.build(sam)
         self.text_proj = nn.Linear(self.llava.config.text_config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
+        if pretrained is not None:
+            _ = self.load_state_dict(guess_load_checkpoint(pretrained), strict=False)
 
     def _forward(self, data_sample):
         text_layer_weights = self.get_text_layer_weights()
