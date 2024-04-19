@@ -473,6 +473,18 @@ class FrozenLlavaSAM(FrozenLlava):
             return_dict_in_generate=True,
             use_cache=True,
             **kwargs)
+        import pdb; pdb.set_trace()
+        output_debug = self.llava.generate(
+            input_ids=input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
+            use_cache=True,
+            **kwargs)
+        import pdb; pdb.set_trace()
+
 
         output_ids = output.sequences[0, :-1]   # the last token was not passed through the model
         assert input_ids[0] == logits.argmax()
