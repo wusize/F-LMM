@@ -74,11 +74,20 @@ class GCGWrapper(nn.Module):
 
     @torch.no_grad()
     def forward(self, data_sample):
-        output_ids, key_phrase_ids, pred_masks = self.model.gcg_forward(data_sample)
+        output_ids, key_phrase_ids, pred_masks = self.model.gcg_forward(
+            data_sample,
+            generation_config=self.gen_config,
+            stopping_criteria=self.stop_criteria
+        )
+        output_ids_debug = self.model.caption_forward(data_sample,
+                                                      generation_config=self.gen_config,
+                                                      stopping_criteria=self.stop_criteria
+                                                      )
+        import pdb; pdb.set_trace()
         caption = self.tokenizer.decode(output_ids, skip_special_tokens=True)
 
         phrases = [self.tokenizer.decode(key_phrase_ids_, skip_special_tokens=True)
-                    for key_phrase_ids_ in key_phrase_ids]
+                   for key_phrase_ids_ in key_phrase_ids]
 
         uncompressed_mask_rles = mask_to_rle_pytorch(pred_masks)
         rle_masks = []

@@ -503,7 +503,7 @@ class FrozenLlavaSAM(FrozenLlava):
             key_phrase_ids.append(output_ids[key_phrase])
             text_embeds.append(self.text_proj(hidden_states[key_phrase]))
         del attentions
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         meta_data = data_sample['meta_data']
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
@@ -526,3 +526,19 @@ class FrozenLlavaSAM(FrozenLlava):
         pred_masks = pred_masks > 0
 
         return output_ids, key_phrase_ids, pred_masks
+
+    @torch.no_grad()
+    def caption_forward(self, data_sample, **kwargs):
+        # for now we implement greedy search only
+        input_ids = data_sample['input_ids'][None].to(self.llava.device)
+        pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
+                                                            dtype=self.llava.dtype)
+        attention_mask = torch.ones(input_ids.shape, device=self.llava.device, dtype=torch.bool)
+        output = self.llava.generate(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            attention_mask=attention_mask,
+            use_cache=True,
+            **kwargs)[0]
+
+        return output
