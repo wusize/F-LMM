@@ -63,7 +63,7 @@ class KeyPhraseHead(nn.Module):
 
         query = self.encoder(query=query[None], query_pos=query_pos[None],
                              key_padding_mask=None)[0]
-        cls_logits = self.cls_proj(query).view(-1)
+        cls_logits = self.cls_proj(query[-self.max_num:]).view(-1)
         query = self.out_proj(query)
         mask_logits = query[-self.max_num:] @ query[:seq_len].T
         if labels is None:
