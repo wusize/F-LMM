@@ -548,7 +548,8 @@ class FrozenFuyuSAM(FrozenFuyu):
         key_phrase_ids = []
         text_embeds = []
         for key_phrase in key_phrases:
-            assert key_phrase.sum() > 0
+            if key_phrase.sum() == 0:
+                key_phrase = torch.ones_like(key_phrase)
             mask_attentions.append(torch.cat(
                 [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions]))
             key_phrase_ids.append(output_ids[key_phrase])
