@@ -210,6 +210,105 @@ class FrozenLlavaNext(BaseModel):
         return self._forward(data_sample)['pred_masks']
 
 
+
+    @torch.no_grad()
+    def gcg_forward(self, data_sample, **kwargs):
+        # for now we implement greedy search only
+        input_ids = data_sample['input_ids'][None].to(self.llava.device)
+        pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
+                                                            dtype=self.llava.dtype)
+        image_sizes = data_sample['image_sizes'][None].to(self.llava.device)
+        attention_mask = torch.ones(input_ids.shape, device=self.llava.device, dtype=torch.bool)
+        output = self.llava(input_ids=input_ids,
+                            pixel_values=pixel_values,
+                            attention_mask=attention_mask,
+                            image_sizes=image_sizes,
+                            use_cache=True)
+
+        image_to_overwrite = output.image_to_overwrite[0]
+        fine_image_feature_h, fine_image_feature_w = output.image_feature_shapes[0]
+        past_key_values = output.past_key_values
+        cache_length = past_key_values[0][0].shape[2]
+        assert len(image_to_overwrite) == cache_length
+        coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
+        coarse_image_feature_h, coarse_image_feature_w = (
+            coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
+
+        logits = output.logits[0]
+        del output
+        input_ids = logits.argmax().view(1, 1)
+        attention_mask = torch.cat([attention_mask,
+                                    torch.tensor([[1]], device=self.llava.device, dtype=torch.bool)],
+                                   dim=-1)
+
+        output = self.llava.language_model.generate(
+            input_ids=input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
+            use_cache=True,
+            **kwargs)
+
+        output_ids = output.sequences[0, :-1]
+        assert input_ids[0] == logits.argmax()
+        attentions = output.attentions
+        image_to_overwrite = torch.cat([image_to_overwrite,
+                                        torch.zeros(len(output_ids), dtype=torch.bool, device=self.llava.device)],
+                                       dim=0)
+        attentions = [attn[0, ..., image_to_overwrite] for attn in attentions]
+        hidden_states = output.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        # do keyword detection
+        text_layer_weights = self.get_text_layer_weights()
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
+        key_phrases = self.key_phrase_head(hidden_states)  # num_key_phrases, answer_len
+        if len(key_phrases) == 0:
+            key_phrases = torch.ones((1, len(output_ids)),
+                                     device=self.llava.device, dtype=torch.bool)
+        attentions_with_coarse = [
+            attn[..., :coarse_image_feature_h * coarse_image_feature_w].view(
+                *attn.shape[:-1], coarse_image_feature_h, coarse_image_feature_w
+            ) for attn in attentions]
+        attentions_with_fine = [
+            attn[..., coarse_image_feature_h * coarse_image_feature_w:].view(
+                *attn.shape[:-1], fine_image_feature_h, fine_image_feature_w + 1
+            )[..., :-1] for attn in attentions]
+        key_phrase_ids = []
+        attentions_with_coarse_list = []
+        attentions_with_fine_list = []
+        for key_phrase in key_phrases:
+            assert key_phrase.sum() > 0
+            mask_attentions_with_coarse = torch.cat(
+                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions_with_coarse])
+            mask_attentions_with_fine = torch.cat(
+                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions_with_fine])
+            attentions_with_coarse_list.append(mask_attentions_with_coarse)
+            attentions_with_fine_list.append(mask_attentions_with_fine)
+            key_phrase_ids.append(output_ids[key_phrase])
+        del attentions
+
+        attentions_with_coarse = torch.stack(attentions_with_coarse_list)
+        attentions_with_fine = torch.stack(attentions_with_fine_list)
+
+        mask_attentions = torch.cat([
+            F.interpolate(attentions_with_coarse.float(),
+                          size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
+            F.interpolate(attentions_with_fine.float(),
+                          size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
+        ], dim=1).to(self.mask_head.dtype)
+        del attentions_with_coarse, attentions_with_fine
+
+        pred_masks = self.mask_head(mask_attentions)[:, 0]
+        height, width = data_sample['height'], data_sample['width']
+        pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
+        pred_masks = pred_masks > 0
+
+        return output_ids, key_phrase_ids, pred_masks
+
+
 class FrozenLlavaNextSAM(FrozenLlavaNext):
     def __init__(self, sam, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -380,3 +479,104 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
     @torch.no_grad()
     def predict(self, data_sample):
         return self._forward(data_sample)['sam_pred_masks']
+
+
+    @torch.no_grad()
+    def gcg_forward(self, data_sample, **kwargs):
+        # for now we implement greedy search only
+        input_ids = data_sample['input_ids'][None].to(self.llava.device)
+        pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
+                                                            dtype=self.llava.dtype)
+        image_sizes = data_sample['image_sizes'][None].to(self.llava.device)
+        attention_mask = torch.ones(input_ids.shape, device=self.llava.device, dtype=torch.bool)
+        output = self.llava(input_ids=input_ids,
+                            pixel_values=pixel_values,
+                            attention_mask=attention_mask,
+                            image_sizes=image_sizes,
+                            use_cache=True)
+
+        image_to_overwrite = output.image_to_overwrite[0]
+        fine_image_feature_h, fine_image_feature_w = output.image_feature_shapes[0]
+        past_key_values = output.past_key_values
+        cache_length = past_key_values[0][0].shape[2]
+        assert len(image_to_overwrite) == cache_length
+        coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
+        coarse_image_feature_h, coarse_image_feature_w = (
+            coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
+
+        logits = output.logits[0]
+        del output
+        input_ids = logits.argmax().view(1, 1)
+        attention_mask = torch.cat([attention_mask,
+                                    torch.tensor([[1]], device=self.llava.device, dtype=torch.bool)],
+                                   dim=-1)
+
+        output = self.llava.language_model.generate(
+            input_ids=input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
+            use_cache=True,
+            **kwargs)
+
+        output_ids = output.sequences[0, :-1]
+        assert input_ids[0] == logits.argmax()
+        attentions = output.attentions
+        image_to_overwrite = torch.cat([image_to_overwrite,
+                                        torch.zeros(len(output_ids), dtype=torch.bool, device=self.llava.device)],
+                                       dim=0)
+        attentions = [attn[0, ..., image_to_overwrite] for attn in attentions]
+        hidden_states = output.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        # do keyword detection
+        text_layer_weights = self.get_text_layer_weights()
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
+        key_phrases = self.key_phrase_head(hidden_states)  # num_key_phrases, answer_len
+        if len(key_phrases) == 0:
+            key_phrases = torch.ones((1, len(output_ids)),
+                                     device=self.llava.device, dtype=torch.bool)
+        attentions_with_coarse = [
+            attn[..., :coarse_image_feature_h * coarse_image_feature_w].view(
+                *attn.shape[:-1], coarse_image_feature_h, coarse_image_feature_w
+            ) for attn in attentions]
+        attentions_with_fine = [
+            attn[..., coarse_image_feature_h * coarse_image_feature_w:].view(
+                *attn.shape[:-1], fine_image_feature_h, fine_image_feature_w + 1
+            )[..., :-1] for attn in attentions]
+        key_phrase_ids = []
+        text_embeds = []
+        attentions_with_coarse_list = []
+        attentions_with_fine_list = []
+        for key_phrase in key_phrases:
+            assert key_phrase.sum() > 0
+            mask_attentions_with_coarse = torch.cat(
+                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions_with_coarse])
+            mask_attentions_with_fine = torch.cat(
+                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions_with_fine])
+            attentions_with_coarse_list.append(mask_attentions_with_coarse)
+            attentions_with_fine_list.append(mask_attentions_with_fine)
+            key_phrase_ids.append(output_ids[key_phrase])
+            text_embeds.append(self.text_proj(hidden_states[key_phrase]))
+        del attentions
+
+        attentions_with_coarse = torch.stack(attentions_with_coarse_list)
+        attentions_with_fine = torch.stack(attentions_with_fine_list)
+
+        mask_attentions = torch.cat([
+            F.interpolate(attentions_with_coarse.float(),
+                          size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear'),
+            F.interpolate(attentions_with_fine.float(),
+                          size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
+        ], dim=1).to(self.mask_head.dtype)
+        del attentions_with_coarse, attentions_with_fine
+
+        pred_masks = self.mask_head(mask_attentions)[:, 0]
+        pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
+        height, width = data_sample['height'], data_sample['width']
+        pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
+        pred_masks = pred_masks > 0
+
+        return output_ids, key_phrase_ids, pred_masks

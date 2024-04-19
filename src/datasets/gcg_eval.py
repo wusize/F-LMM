@@ -1,13 +1,10 @@
 import os
 import io
-import json
 import copy
 import torch
 import numpy as np
-import torch.nn.functional as F
 from torch.utils.data import Dataset
 from PIL import Image
-import random
 try:
     from petrel_client.client import Client
 except:
@@ -16,10 +13,6 @@ except:
 import pycocotools.mask as mask_utils
 from pycocotools.coco import COCO
 from xtuner.registry import BUILDER
-from typing import Dict, Sequence
-from tqdm import tqdm
-from torch.utils.data import ConcatDataset
-from xtuner.utils.constants import IGNORE_INDEX
 
 
 class GCGEvalDataset(Dataset):
@@ -89,6 +82,7 @@ class GCGEvalDataset(Dataset):
         data_sample.update(input_ids=input_ids,
                            pixel_values=pixel_values,
                            meta_data=meta_data,
+                           image_sizes=torch.tensor(image_data['image_sizes'][0]),  # only used for llava-next
                            gt_masks=gt_masks)
 
         return data_sample
@@ -110,7 +104,7 @@ if __name__ == '__main__':
         mask_json_file='data/GranDf/val_test/test_gcg_coco_mask_gt.json',
         image_processor=image_processor,
         tokenizer=tokenizer,
-        ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
+        ceph_path='BJ17:S3://wusize/GranDf_HA_images/val_test',
         local_path='data/GranDf_HA_images/val_test',
         prompt_template=prompt_template,
         prompt=prompt
