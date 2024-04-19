@@ -32,7 +32,8 @@ class KeyPhraseHead(nn.Module):
                  in_channels=256,
                  encoder=None,
                  loss_mask=None,
-                 loss_dice=None, detach=True):
+                 loss_dice=None, detach=True,
+                 cls_thr=0.3):
         super(KeyPhraseHead, self).__init__()
         self.encoder = DetrTransformerEncoder(**encoder)
         embed_dim = self.encoder.embed_dims
@@ -45,6 +46,7 @@ class KeyPhraseHead(nn.Module):
         self.out_proj = nn.Linear(embed_dim, embed_dim)
         self.cls_proj = nn.Linear(embed_dim, 1)
         self.detach = detach
+        self.cls_thr = cls_thr
         self._init_weights()
 
     def _init_weights(self):
@@ -69,7 +71,10 @@ class KeyPhraseHead(nn.Module):
         if labels is None:
             import pdb; pdb.set_trace()
             pred_masks = mask_logits > 0.0
-            pred_masks = pred_masks[cls_logits > 0]
+            positive = cls_logits.sigmoid() > self.cls_thr
+            if positive.sum() == 0:
+                positive = [cls_logits.argmax()]
+            pred_masks = pred_masks[positive]
             return pred_masks
         else:
             label_ids = torch.unique(labels)
