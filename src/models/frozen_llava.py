@@ -223,10 +223,7 @@ class FrozenLlava(BaseModel):
         logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.cat([attention_mask,
-                                    torch.tensor([[1]], device=self.llava.device, dtype=torch.bool)],
-                                   dim=-1)
-
+        attention_mask = torch.ones((1, cache_length + 1), device=self.llava.device, dtype=torch.bool)
         output = self.llava.language_model.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
