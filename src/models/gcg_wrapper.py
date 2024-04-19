@@ -78,12 +78,11 @@ class GCGWrapper(nn.Module):
             generation_config=self.gen_config,
             stopping_criteria=self.stop_criteria
         )
-        output_ids_debug = self.model.caption_forward(data_sample,
+        output0, output1, output2, output3 = self.model.caption_forward(data_sample,
                                                       generation_config=self.gen_config,
                                                       stopping_criteria=self.stop_criteria
                                                       )
         caption = self.tokenizer.decode(output_ids, skip_special_tokens=True)
-        caption_debug = self.tokenizer.decode(output_ids_debug, skip_special_tokens=True)
         import pdb; pdb.set_trace()
 
         phrases = [self.tokenizer.decode(key_phrase_ids_, skip_special_tokens=True)

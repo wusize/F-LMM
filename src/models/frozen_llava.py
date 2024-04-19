@@ -537,15 +537,24 @@ class FrozenLlavaSAM(FrozenLlava):
         pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
                                                             dtype=self.llava.dtype)
         attention_mask = torch.ones(input_ids.shape, device=self.llava.device, dtype=torch.bool)
-        # output = self.llava.generate(
-        #     input_ids=input_ids,
-        #     pixel_values=pixel_values,
-        #     attention_mask=attention_mask,
-        #     use_cache=True,
-        #     # output_attentions=True,
-        #     # output_hidden_states=True,
-        #     # return_dict_in_generate=True,
-        #     **kwargs)
+        output0 = self.llava.generate(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            attention_mask=attention_mask,
+            use_cache=True,
+            # output_attentions=True,
+            # output_hidden_states=True,
+            # return_dict_in_generate=True,
+            **kwargs)[0]
+        output1 = self.llava.generate(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            attention_mask=attention_mask,
+            use_cache=True,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
+            **kwargs).sequences[0]
         # import pdb; pdb.set_trace()
 
         output = self.llava(input_ids=input_ids,
@@ -558,11 +567,21 @@ class FrozenLlavaSAM(FrozenLlava):
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length+1), device=self.llava.device, dtype=torch.bool)
-        output = self.llava.generate(
+        output2 = self.llava.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
             use_cache=True,
-            **kwargs)
+            **kwargs)[0]
 
-        return output[0]
+        output3 = self.llava.generate(
+            input_ids=input_ids,
+            past_key_values=past_key_values,
+            attention_mask=attention_mask,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
+            use_cache=True,
+            **kwargs).sequences[0]
+
+        return output0, output1, output2, output3
