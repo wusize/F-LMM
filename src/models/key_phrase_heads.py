@@ -105,7 +105,7 @@ class KeyPhraseHead(nn.Module):
         loss_dice = self.loss_dice(mask_logits, gt_masks, avg_factor=mask_logits.shape[0])
         loss_mask = self.loss_mask(mask_logits.view(-1), gt_masks.view(-1),
                                    avg_factor=mask_logits.numel())
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         cls_target = torch.zeros_like(cls_logits)
         cls_target[col_ids.tolist()] = 1.0
         loss_cls = F.binary_cross_entropy_with_logits(input=cls_logits, target=cls_target)
