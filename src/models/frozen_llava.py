@@ -272,9 +272,12 @@ class FrozenLlava(BaseModel):
         del attentions
 
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
+        meta_data = data_sample['meta_data']
+        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
+        mask_attentions = mask_attentions.view(*mask_attentions.shape[:-1], llava_h, llava_w)
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
-        meta_data = data_sample['meta_data']
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
         before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
         before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
@@ -502,9 +505,12 @@ class FrozenLlavaSAM(FrozenLlava):
         del attentions
         import pdb; pdb.set_trace()
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
+        meta_data = data_sample['meta_data']
+        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
+        mask_attentions = mask_attentions.view(*mask_attentions.shape[:-1], llava_h, llava_w)
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
-        meta_data = data_sample['meta_data']
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
         before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
         before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
