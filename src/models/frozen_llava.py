@@ -547,4 +547,4 @@ class FrozenLlavaSAM(FrozenLlava):
             **kwargs)
         # import pdb; pdb.set_trace()
 
-        return output
+        return output[0]
