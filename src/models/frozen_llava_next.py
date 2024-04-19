@@ -287,7 +287,8 @@ class FrozenLlavaNext(BaseModel):
         attentions_with_coarse_list = []
         attentions_with_fine_list = []
         for key_phrase in key_phrases:
-            assert key_phrase.sum() > 0
+            if key_phrase.sum() == 0:
+                key_phrase = torch.ones_like(key_phrase)
             mask_attentions_with_coarse = torch.cat(
                 [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions_with_coarse])
             mask_attentions_with_fine = torch.cat(
@@ -565,7 +566,8 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         attentions_with_coarse_list = []
         attentions_with_fine_list = []
         for key_phrase in key_phrases:
-            assert key_phrase.sum() > 0
+            if key_phrase.sum() == 0:
+                key_phrase = torch.ones_like(key_phrase)
             mask_attentions_with_coarse = torch.cat(
                 [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions_with_coarse])
             mask_attentions_with_fine = torch.cat(
