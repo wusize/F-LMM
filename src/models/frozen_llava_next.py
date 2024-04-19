@@ -245,7 +245,7 @@ class FrozenLlavaNext(BaseModel):
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
 
-        output = self.llava.language_model.generate(
+        output = self.llava.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
@@ -523,7 +523,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
 
-        output = self.llava.language_model.generate(
+        output = self.llava.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,

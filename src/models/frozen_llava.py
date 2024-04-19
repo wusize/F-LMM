@@ -231,7 +231,7 @@ class FrozenLlava(BaseModel):
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
-        output = self.llava.language_model.generate(
+        output = self.llava.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
@@ -464,7 +464,7 @@ class FrozenLlavaSAM(FrozenLlava):
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length+1), device=self.llava.device, dtype=torch.bool)
-        output = self.llava.language_model.generate(
+        output = self.llava.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
@@ -473,18 +473,6 @@ class FrozenLlavaSAM(FrozenLlava):
             return_dict_in_generate=True,
             use_cache=True,
             **kwargs)
-        import pdb; pdb.set_trace()
-        output_debug = self.llava.generate(
-            input_ids=input_ids,
-            past_key_values=past_key_values,
-            attention_mask=attention_mask,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict_in_generate=True,
-            use_cache=True,
-            **kwargs)
-        import pdb; pdb.set_trace()
-
 
         output_ids = output.sequences[0, :-1]   # the last token was not passed through the model
         assert input_ids[0] == logits.argmax()
@@ -503,6 +491,7 @@ class FrozenLlavaSAM(FrozenLlava):
         hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
 
         key_phrases = self.key_phrase_head(hidden_states)  # num_key_phrases, answer_len
+        import pdb; pdb.set_trace()
         if len(key_phrases) == 0:
             key_phrases = torch.ones((1, len(output_ids)),
                                      device=self.llava.device, dtype=torch.bool)
