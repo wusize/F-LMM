@@ -234,7 +234,7 @@ class FrozenLlavaNext(BaseModel):
         coarse_image_feature_h, coarse_image_feature_w = (
             coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
 
-        logits = output.logits[0]
+        logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.cat([attention_mask,
@@ -504,7 +504,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         coarse_image_feature_h, coarse_image_feature_w = (
             coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
 
-        logits = output.logits[0]
+        logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.cat([attention_mask,

@@ -220,7 +220,7 @@ class FrozenLlava(BaseModel):
 
         assert len(image_to_overwrite) == cache_length
 
-        logits = output.logits[0]
+        logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.cat([attention_mask,
@@ -443,7 +443,7 @@ class FrozenLlavaSAM(FrozenLlava):
 
         assert len(image_to_overwrite) == cache_length
 
-        logits = output.logits[0]
+        logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.cat([attention_mask,
