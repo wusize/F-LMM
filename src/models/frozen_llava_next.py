@@ -158,6 +158,7 @@ class FrozenLlavaNext(BaseModel):
 
         losses_dice_phrase = []
         losses_mask_phrase = []
+        losses_cls_phrase = []
         aious_phrase = []
 
         for data_sample in data:
@@ -188,11 +189,12 @@ class FrozenLlavaNext(BaseModel):
 
             labels, mask_ids, hidden_states = (forward_output['labels'],
                                                forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
-                hidden_states[labels>=0], mask_ids[labels>=0])
+            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
+                hidden_states[labels >= 0], mask_ids[labels >= 0])
             losses_dice_phrase.append(loss_dice_phrase)
             losses_mask_phrase.append(loss_mask_phrase)
             aious_phrase.append(aiou_phrase)
+            losses_cls_phrase.append(loss_cls_phrase)
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
@@ -201,6 +203,7 @@ class FrozenLlavaNext(BaseModel):
                      'aiou': aiou / mask_cnts,
                      'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
                      'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
                      'aiou_phrase': sum(aious_phrase) / len(data)
                      }
         return loss_dict
@@ -208,8 +211,6 @@ class FrozenLlavaNext(BaseModel):
     @torch.no_grad()
     def predict(self, data_sample):
         return self._forward(data_sample)['pred_masks']
-
-
 
     @torch.no_grad()
     def gcg_forward(self, data_sample, **kwargs):
@@ -411,6 +412,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
 
         losses_dice_phrase = []
         losses_mask_phrase = []
+        losses_cls_phrase = []
         aious_phrase = []
 
         for data_sample in data:
@@ -439,10 +441,11 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
 
             labels, mask_ids, hidden_states = (forward_output['labels'],
                                                forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
+            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
                 hidden_states[labels >= 0], mask_ids[labels >= 0])
             losses_dice_phrase.append(loss_dice_phrase)
             losses_mask_phrase.append(loss_mask_phrase)
+            losses_cls_phrase.append(loss_cls_phrase)
             aious_phrase.append(aiou_phrase)
 
         assert mask_cnts > 0
@@ -456,6 +459,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                      'sam_aiou': sam_aiou / mask_cnts,
                      'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
                      'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
                      'aiou_phrase': sum(aious_phrase) / len(data)
                      }
 

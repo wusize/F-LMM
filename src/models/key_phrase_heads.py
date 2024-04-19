@@ -1,6 +1,7 @@
 import math
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 from xtuner.registry import BUILDER
 from mmdet.models import DetrTransformerEncoder
@@ -42,6 +43,7 @@ class KeyPhraseHead(nn.Module):
         self.loss_dice = BUILDER.build(loss_dice)
         self.in_proj = nn.Linear(in_channels, embed_dim)
         self.out_proj = nn.Linear(embed_dim, embed_dim)
+        self.cls_proj = nn.Linear(embed_dim, 1)
         self.detach = detach
         self._init_weights()
 
@@ -61,18 +63,19 @@ class KeyPhraseHead(nn.Module):
 
         query = self.encoder(query=query[None], query_pos=query_pos[None],
                              key_padding_mask=None)[0]
+        cls_logits = self.cls_proj(query).view(-1)
         query = self.out_proj(query)
-        logits = query[-self.max_num:] @ query[:seq_len].T
+        mask_logits = query[-self.max_num:] @ query[:seq_len].T
         if labels is None:
-            pred_masks = logits > 0.0
-            pred_masks = pred_masks[pred_masks.sum(dim=-1) > 0]
+            pred_masks = mask_logits > 0.0
+            pred_masks = pred_masks[cls_logits > 0]
             return pred_masks
         else:
             label_ids = torch.unique(labels)
             gt_masks = torch.stack([labels == label_id
                                     for label_id in label_ids if label_id >= 0]).to(self.dtype)
             assert len(gt_masks) > 0
-            return self.loss(logits, gt_masks)
+            return self.loss(mask_logits, gt_masks, cls_logits)
 
     @property
     def dtype(self):
@@ -82,9 +85,9 @@ class KeyPhraseHead(nn.Module):
     def device(self):
         return self.key_phrase_queries.device
 
-    def loss(self, logits, gt_masks):
+    def loss(self, mask_logits, gt_masks, cls_logits):
         with torch.no_grad():
-            pred_masks = (logits > 0.0).to(self.dtype)
+            pred_masks = (mask_logits > 0.0).to(self.dtype)
             mask_prod = gt_masks[:, None] * pred_masks[None]   # num_gt, num_pred, seq_len
             mask_sum = gt_masks[:, None] + pred_masks[None]
             intersection = mask_prod.sum(dim=-1)   # num_gt, num_pred
@@ -97,23 +100,14 @@ class KeyPhraseHead(nn.Module):
                                                                dtype=self.dtype).mean()
             del pred_masks
 
-        pos_gt_masks = gt_masks[row_ids.tolist()]
-        pos_logits = logits[col_ids.tolist()]
-        loss_dice = self.loss_dice(pos_logits, pos_gt_masks, avg_factor=pos_logits.shape[0])
-        loss_mask_pos = self.loss_mask(pos_logits.view(-1), pos_gt_masks.view(-1),
-                                       avg_factor=pos_logits.numel())
+        gt_masks = gt_masks[row_ids.tolist()]
+        mask_logits = mask_logits[col_ids.tolist()]
+        loss_dice = self.loss_dice(mask_logits, gt_masks, avg_factor=mask_logits.shape[0])
+        loss_mask = self.loss_mask(mask_logits.view(-1), gt_masks.view(-1),
+                                   avg_factor=mask_logits.numel())
 
-        pos_pred = torch.zeros(len(logits), device=self.device, dtype=torch.bool)
-        pos_pred[col_ids.tolist()] = True
-        neg_logits = logits[torch.logical_not(pos_pred)]
-        assert len(neg_logits) + len(pos_logits) == len(logits)
-        neg_gt_masks = torch.zeros_like(neg_logits)
-        if len(neg_logits) > 0:
-            loss_mask_neg = self.loss_mask(neg_logits.view(-1), neg_gt_masks.view(-1),
-                                           avg_factor=neg_logits.numel())
-        else:
-            loss_mask_neg = loss_mask_pos
+        cls_target = torch.zeros_like(cls_logits)
+        cls_target[col_ids.tolist()] = 1.0
+        loss_cls = F.binary_cross_entropy_with_logits(input=cls_logits, target=cls_target)
 
-        loss_mask = (loss_mask_pos + loss_mask_neg) * 0.5
-
-        return loss_dice, loss_mask, aiou
+        return loss_dice, loss_mask, loss_cls, aiou

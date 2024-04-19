@@ -143,6 +143,7 @@ class FrozenLlava(BaseModel):
 
         losses_dice_phrase = []
         losses_mask_phrase = []
+        losses_cls_phrase = []
         aious_phrase = []
 
 
@@ -165,12 +166,12 @@ class FrozenLlava(BaseModel):
 
             labels, mask_ids, hidden_states = (forward_output['labels'],
                                                forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
-                hidden_states[labels>=0], mask_ids[labels>=0])
+            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
+                hidden_states[labels >= 0], mask_ids[labels >= 0])
             losses_dice_phrase.append(loss_dice_phrase)
             losses_mask_phrase.append(loss_mask_phrase)
             aious_phrase.append(aiou_phrase)
-
+            losses_cls_phrase.append(loss_cls_phrase)
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,
@@ -179,6 +180,7 @@ class FrozenLlava(BaseModel):
                      'aiou': aiou / mask_cnts,
                      'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
                      'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
                      'aiou_phrase': sum(aious_phrase) / len(data)
                      }
 
@@ -282,6 +284,7 @@ class FrozenLlava(BaseModel):
 
         return output_ids, key_phrase_ids, pred_masks
 
+
 class FrozenLlavaSAM(FrozenLlava):
     def __init__(self, sam, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -372,6 +375,7 @@ class FrozenLlavaSAM(FrozenLlava):
 
         losses_dice_phrase = []
         losses_mask_phrase = []
+        losses_cls_phrase = []
         aious_phrase = []
 
         for data_sample in data:
@@ -401,10 +405,11 @@ class FrozenLlavaSAM(FrozenLlava):
 
             labels, mask_ids, hidden_states = (forward_output['labels'],
                                                forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, aiou_phrase = self.key_phrase_head(
+            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
                 hidden_states[labels >= 0], mask_ids[labels >= 0])
             losses_dice_phrase.append(loss_dice_phrase)
             losses_mask_phrase.append(loss_mask_phrase)
+            losses_cls_phrase.append(loss_cls_phrase)
             aious_phrase.append(aiou_phrase)
 
         assert mask_cnts > 0
@@ -419,6 +424,7 @@ class FrozenLlavaSAM(FrozenLlava):
                      'sam_aiou': sam_aiou / mask_cnts,
                      'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
                      'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
                      'aiou_phrase': sum(aious_phrase) / len(data)
                      }
 
@@ -445,7 +451,6 @@ class FrozenLlavaSAM(FrozenLlava):
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length+1), device=self.llava.device, dtype=torch.bool)
-        import pdb; pdb.set_trace()
         output = self.llava.language_model.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
@@ -467,7 +472,7 @@ class FrozenLlavaSAM(FrozenLlava):
         hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
         hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
                          for layer_id in range(1, 1+num_layers)]
-
+        import pdb; pdb.set_trace()
         # do keyword detection
         text_layer_weights = self.get_text_layer_weights()
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
