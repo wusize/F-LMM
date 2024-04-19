@@ -521,7 +521,7 @@ class FrozenLlavaSAM(FrozenLlava):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
 
         pred_masks = pred_masks[:, before_height:before_height + mask_h,
-                     before_width:before_width + mask_w].contiguous()
+                                   before_width:before_width + mask_w].contiguous()
         pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
 
         height, width = data_sample['height'], data_sample['width']

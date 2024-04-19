@@ -62,7 +62,6 @@ class GCGWrapper(nn.Module):
 
         self.gen_config = GenerationConfig(
             max_new_tokens=max_new_tokens,
-            do_sample=False,
             eos_token_id=self.tokenizer.eos_token_id,
             pad_token_id=self.tokenizer.pad_token_id
             if self.tokenizer.pad_token_id is not None else

@@ -69,7 +69,7 @@ class KeyPhraseHead(nn.Module):
         query = self.out_proj(query)
         mask_logits = query[-self.max_num:] @ query[:seq_len].T
         if labels is None:
-            # import pdb; pdb.set_trace()
+            import pdb; pdb.set_trace()
             pred_masks = mask_logits > 0.0
             positive = cls_logits.sigmoid() > self.cls_thr
             if positive.sum() == 0:
