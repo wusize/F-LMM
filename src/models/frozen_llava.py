@@ -539,6 +539,10 @@ class FrozenLlavaSAM(FrozenLlava):
             pixel_values=pixel_values,
             attention_mask=attention_mask,
             use_cache=True,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
             **kwargs)[0]
+        import pdb; pdb.set_trace()
 
         return output
