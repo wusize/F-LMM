@@ -537,15 +537,32 @@ class FrozenLlavaSAM(FrozenLlava):
         pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
                                                             dtype=self.llava.dtype)
         attention_mask = torch.ones(input_ids.shape, device=self.llava.device, dtype=torch.bool)
+        # output = self.llava.generate(
+        #     input_ids=input_ids,
+        #     pixel_values=pixel_values,
+        #     attention_mask=attention_mask,
+        #     use_cache=True,
+        #     # output_attentions=True,
+        #     # output_hidden_states=True,
+        #     # return_dict_in_generate=True,
+        #     **kwargs)
+        # import pdb; pdb.set_trace()
+
+        output = self.llava(input_ids=input_ids,
+                            pixel_values=pixel_values,
+                            attention_mask=attention_mask,
+                            use_cache=True)
+        past_key_values = output.past_key_values
+        past_length = past_key_values[0][0].shape[2]
+        logits = output.logits[0, -1]
+        del output
+        input_ids = logits.argmax().view(1, 1)
+        attention_mask = torch.ones((1, past_length+1), device=self.llava.device, dtype=torch.bool)
         output = self.llava.generate(
             input_ids=input_ids,
-            pixel_values=pixel_values,
+            past_key_values=past_key_values,
             attention_mask=attention_mask,
             use_cache=True,
-            # output_attentions=True,
-            # output_hidden_states=True,
-            # return_dict_in_generate=True,
             **kwargs)
-        # import pdb; pdb.set_trace()
 
         return output[0]
