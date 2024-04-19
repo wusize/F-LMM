@@ -228,8 +228,8 @@ class FrozenLlavaNext(BaseModel):
         image_to_overwrite = output.image_to_overwrite[0]
         fine_image_feature_h, fine_image_feature_w = output.image_feature_shapes[0]
         past_key_values = output.past_key_values
-        cache_length = past_key_values[0][0].shape[2]
-        assert len(image_to_overwrite) == cache_length
+        past_length = past_key_values[0][0].shape[2]
+        assert len(image_to_overwrite) == past_length
         coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
         coarse_image_feature_h, coarse_image_feature_w = (
             coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
@@ -237,7 +237,7 @@ class FrozenLlavaNext(BaseModel):
         logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.ones((1, cache_length + 1), device=self.llava.device, dtype=torch.bool)
+        attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
 
         output = self.llava.language_model.generate(
             input_ids=input_ids,
@@ -251,12 +251,15 @@ class FrozenLlavaNext(BaseModel):
 
         output_ids = output.sequences[0, :-1]
         assert input_ids[0] == logits.argmax()
-        attentions = output.attentions
-        image_to_overwrite = torch.cat([image_to_overwrite,
-                                        torch.zeros(len(output_ids), dtype=torch.bool, device=self.llava.device)],
-                                       dim=0)
-        attentions = [attn[0, ..., image_to_overwrite] for attn in attentions]
-        hidden_states = output.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
+        assert len(attentions) == len(output_ids)
+        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
+        num_layers = len(attentions[0])
+        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_to_overwrite]
+                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
+        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
+        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
+                         for layer_id in range(1, 1+num_layers)]
         # do keyword detection
         text_layer_weights = self.get_text_layer_weights()
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
@@ -496,8 +499,8 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         image_to_overwrite = output.image_to_overwrite[0]
         fine_image_feature_h, fine_image_feature_w = output.image_feature_shapes[0]
         past_key_values = output.past_key_values
-        cache_length = past_key_values[0][0].shape[2]
-        assert len(image_to_overwrite) == cache_length
+        past_length = past_key_values[0][0].shape[2]
+        assert len(image_to_overwrite) == past_length
         coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
         coarse_image_feature_h, coarse_image_feature_w = (
             coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
@@ -505,7 +508,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.ones((1, cache_length + 1), device=self.llava.device, dtype=torch.bool)
+        attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
 
         output = self.llava.language_model.generate(
             input_ids=input_ids,
@@ -519,12 +522,15 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
 
         output_ids = output.sequences[0, :-1]
         assert input_ids[0] == logits.argmax()
-        attentions = output.attentions
-        image_to_overwrite = torch.cat([image_to_overwrite,
-                                        torch.zeros(len(output_ids), dtype=torch.bool, device=self.llava.device)],
-                                       dim=0)
-        attentions = [attn[0, ..., image_to_overwrite] for attn in attentions]
-        hidden_states = output.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
+        assert len(attentions) == len(output_ids)
+        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
+        num_layers = len(attentions[0])
+        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_to_overwrite]
+                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
+        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
+        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2) 
+                         for layer_id in range(1, 1+num_layers)]
         # do keyword detection
         text_layer_weights = self.get_text_layer_weights()
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim

@@ -253,14 +253,14 @@ class FrozenFuyu(BaseModel):
                            use_cache=True)
 
         past_key_values = output.past_key_values
-        cache_length = past_key_values[0][0].shape[2]
+        past_length = past_key_values[0][0].shape[2]
 
-        assert input_ids.shape[1] == cache_length
+        assert input_ids.shape[1] == past_length
 
         logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.ones((1, cache_length + 1), device=self.llava.device, dtype=torch.bool)
+        attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
 
         output = self.fuyu.language_model.generate(
             input_ids=input_ids,
@@ -274,12 +274,15 @@ class FrozenFuyu(BaseModel):
 
         output_ids = output.sequences[0, :-1]
         assert input_ids[0] == logits.argmax()
-        attentions = output.attentions
-        image_patches_indices = torch.cat([image_patches_indices[0],
-                                           -torch.ones_like(output_ids)], dim=0)
-        attentions = [attn[0, ..., image_patches_indices >= 0] for attn in attentions]
-
-        hidden_states = output.hidden_states[-self.fuyu.config.num_hidden_layers:]
+        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
+        assert len(attentions) == len(output_ids)
+        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
+        num_layers = len(attentions[0])
+        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_patches_indices >= 0]
+                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
+        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
+        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
+                         for layer_id in range(1, 1+num_layers)]
 
         # do keyword detection
         text_layer_weights = self.get_text_layer_weights()
@@ -486,14 +489,14 @@ class FrozenFuyuSAM(FrozenFuyu):
                            use_cache=True)
         
         past_key_values = output.past_key_values
-        cache_length = past_key_values[0][0].shape[2]
+        past_length = past_key_values[0][0].shape[2]
 
-        assert input_ids.shape[1] == cache_length
+        assert input_ids.shape[1] == past_length
 
         logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.ones((1, cache_length + 1), device=self.llava.device, dtype=torch.bool)
+        attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
 
         output = self.fuyu.language_model.generate(
             input_ids=input_ids,
@@ -507,13 +510,15 @@ class FrozenFuyuSAM(FrozenFuyu):
 
         output_ids = output.sequences[0, :-1]
         assert input_ids[0] == logits.argmax()
-        attentions = output.attentions
-        image_patches_indices = torch.cat([image_patches_indices[0],
-                                           -torch.ones_like(output_ids)], dim=0)
-        attentions = [attn[0, ..., image_patches_indices >= 0] for attn in attentions]
-
-        hidden_states = output.hidden_states[-self.fuyu.config.num_hidden_layers:]
-
+        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
+        assert len(attentions) == len(output_ids)
+        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
+        num_layers = len(attentions[0])
+        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_patches_indices >= 0]
+                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
+        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
+        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
+                         for layer_id in range(1, 1+num_layers)]
         # do keyword detection
         text_layer_weights = self.get_text_layer_weights()
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
