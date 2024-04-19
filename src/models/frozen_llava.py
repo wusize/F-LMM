@@ -542,7 +542,7 @@ class FrozenLlavaSAM(FrozenLlava):
             output_attentions=True,
             output_hidden_states=True,
             return_dict_in_generate=True,
-            **kwargs)[0]
+            **kwargs)
         import pdb; pdb.set_trace()
 
         return output
