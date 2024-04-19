@@ -82,6 +82,7 @@ class GCGEvalDataset(Dataset):
         data_sample.update(input_ids=input_ids,
                            pixel_values=pixel_values,
                            meta_data=meta_data,
+                           image=image,
                            image_sizes=torch.tensor(image_data['image_sizes'][0]),  # only used for llava-next
                            gt_masks=gt_masks)
 
