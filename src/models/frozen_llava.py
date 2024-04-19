@@ -429,6 +429,7 @@ class FrozenLlavaSAM(FrozenLlava):
     @torch.no_grad()
     def gcg_forward(self, data_sample, **kwargs):
         # for now we implement greedy search only
+        import pdb; pdb.set_trace()
         input_ids = data_sample['input_ids'][None].to(self.llava.device)
         pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
                                                             dtype=self.llava.dtype)
