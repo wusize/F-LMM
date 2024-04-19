@@ -481,7 +481,6 @@ class FrozenLlavaSAM(FrozenLlava):
         hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
         hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
                          for layer_id in range(1, 1+num_layers)]
-        import pdb; pdb.set_trace()
         # do keyword detection
         text_layer_weights = self.get_text_layer_weights()
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
@@ -501,7 +500,7 @@ class FrozenLlavaSAM(FrozenLlava):
             key_phrase_ids.append(output_ids[key_phrase])
             text_embeds.append(self.text_proj(hidden_states[key_phrase]))
         del attentions
-
+        import pdb; pdb.set_trace()
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
