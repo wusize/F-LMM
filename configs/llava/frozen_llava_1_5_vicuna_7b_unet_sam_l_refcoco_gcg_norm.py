@@ -35,7 +35,7 @@ find_unused_parameters = True
 
 # Scheduler & Optimizer
 batch_size = 1  # per_device
-accumulative_counts = 8
+accumulative_counts = 1
 dataloader_num_workers = 0
 max_epochs = 8
 optim_type = AdamW
@@ -59,6 +59,7 @@ prompt_template = PROMPT_TEMPLATE.vicuna
 prompt = "<image>\nPlease give me a description of the image."
 llava_name = 'llava-hf/llava-1.5-7b-hf'
 unet = dict(type=UNetHead,
+            normalize_input=True,
             upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
             in_channels=2048,
             base_channels=64,

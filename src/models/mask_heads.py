@@ -85,7 +85,9 @@ def upsample_forward_func(self, x):
 
 
 class UNetHead(UNet):
-    def __init__(self, upsample_input=None, *args, **kwargs):
+    def __init__(self, upsample_input=None,
+                 normalize_input=False,
+                 *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.conv_seg = nn.Conv2d(self.base_channels, 1, kernel_size=1)
 
@@ -96,6 +98,7 @@ class UNetHead(UNet):
 
         self.init_weights()
         self.upsample_input = upsample_input
+        self.normalize_input = normalize_input
 
     @property
     def dtype(self):
@@ -103,6 +106,11 @@ class UNetHead(UNet):
 
     def forward(self, x):
         h, w = x.shape[-2:]
+        if self.normalize_input:
+            assert x.min() >= 0.0 and x.max() <= 1.0
+            x_sum = x.sum((-2, -1), keepdims=True).clamp(min=1e-12)
+            x = x / x_sum
+
         if self.upsample_input is not None:
             scale_factor = max(1.0, self.upsample_input / max(h, w))
             x = F.interpolate(x.float(), scale_factor=scale_factor, mode='bilinear').to(x)

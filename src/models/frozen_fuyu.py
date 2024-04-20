@@ -433,10 +433,10 @@ class FrozenFuyuSAM(FrozenFuyu):
         sam_accuracy = 0
         sam_aiou = 0
 
-        losses_dice_phrase = []
-        losses_mask_phrase = []
-        losses_cls_phrase = []
-        aious_phrase = []
+        # losses_dice_phrase = []
+        # losses_mask_phrase = []
+        # losses_cls_phrase = []
+        # aious_phrase = []
 
         for data_sample in data:
             forward_output = self._forward(data_sample)
@@ -462,15 +462,15 @@ class FrozenFuyuSAM(FrozenFuyu):
             sam_loss_mask += sam_loss_mask_ * mask_cnt
             sam_accuracy += sam_accuracy_ * mask_cnt
             sam_aiou += sam_aiou_ * mask_cnt
-
-            labels, mask_ids, hidden_states = (forward_output['labels'],
-                                               forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
-                hidden_states[labels >= 0], mask_ids[labels >= 0])
-            losses_dice_phrase.append(loss_dice_phrase)
-            losses_mask_phrase.append(loss_mask_phrase)
-            losses_cls_phrase.append(loss_cls_phrase)
-            aious_phrase.append(aiou_phrase)
+            #
+            # labels, mask_ids, hidden_states = (forward_output['labels'],
+            #                                    forward_output['mask_ids'], forward_output['hidden_states'])
+            # loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
+            #     hidden_states[labels >= 0], mask_ids[labels >= 0])
+            # losses_dice_phrase.append(loss_dice_phrase)
+            # losses_mask_phrase.append(loss_mask_phrase)
+            # losses_cls_phrase.append(loss_cls_phrase)
+            # aious_phrase.append(aiou_phrase)
 
         assert mask_cnts > 0
 
@@ -482,10 +482,10 @@ class FrozenFuyuSAM(FrozenFuyu):
                      'sam_loss_dice': sam_loss_dice / mask_cnts,
                      'sam_accuracy': sam_accuracy / mask_cnts,
                      'sam_aiou': sam_aiou / mask_cnts,
-                     'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
-                     'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
-                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
-                     'aiou_phrase': sum(aious_phrase) / len(data)
+                     # 'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
+                     # 'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
+                     # 'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
+                     # 'aiou_phrase': sum(aious_phrase) / len(data)
                      }
         return loss_dict
 
