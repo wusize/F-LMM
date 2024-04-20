@@ -34,7 +34,10 @@ class FrozenLlava(BaseModel):
         self.mask_head = BUILDER.build(mask_head)
         self.patch_size = self.llava.config.vision_config.patch_size
         self.merge = merge
-        assert merge in ['mean', 'max']
+        assert merge in ['mean', 'max', 'learn']
+
+        if merge == 'learn':
+            self.merge_proj = nn.Linear(self.llava.config.text_config.hidden_size,1)
 
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
@@ -50,12 +53,13 @@ class FrozenLlava(BaseModel):
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
 
-
-    def apply_merge(self, x, dim=1):
+    def apply_merge(self, x, dim=1, weights=None):
         if self.merge == 'mean':
             return x.mean(dim=dim)
         elif self.merge == 'max':
             return x.max(dim=dim).values
+        elif self.merge == 'learn':
+            return (x * weights).sum(dim=dim)
         else:
             raise NotImplementedError
 
@@ -115,8 +119,15 @@ class FrozenLlava(BaseModel):
         for mask_id in range(len(masks)):
             matched = mask_ids == mask_id
             assert matched.sum() > 0
+            matched_len = matched.sum()
+            if self.merge == 'learn':
+                merge_weights = self.merge_proj(hidden_states[matched])[:, 0].softmax(0)   # matched_len
+                merge_weights = merge_weights.view(1, matched_len, 1, 1)
+            else:
+                merge_weights = None
+
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
+                [self.apply_merge(attn[:, matched], dim=1, weights=merge_weights) for attn in attentions]))
 
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
@@ -139,58 +150,6 @@ class FrozenLlava(BaseModel):
 
         return output
 
-    def compute_loss(self, data):
-        mask_cnts = 0
-        loss_dice = 0
-        loss_mask = 0
-        accuracy = 0
-        aiou = 0
-
-        losses_dice_phrase = []
-        losses_mask_phrase = []
-        losses_cls_phrase = []
-        aious_phrase = []
-
-
-        for data_sample in data:
-            forward_output = self._forward(data_sample)
-            pred_masks = forward_output['pred_masks']
-            masks = data_sample['masks'].to(self.llava.device)
-            gt_masks = F.interpolate(masks[None].float(),
-                                     size=pred_masks.shape[-2:])[0].to(pred_masks)
-            mask_cnt = pred_masks.shape[0]
-            assert pred_masks.shape == gt_masks.shape
-            mask_cnts += mask_cnt
-
-            loss_dice_, loss_mask_, accuracy_, aiou_ = self._compute(pred_masks, gt_masks)
-            loss_dice += loss_dice_ * mask_cnt
-            loss_mask += loss_mask_ * mask_cnt
-            accuracy += accuracy_ * mask_cnt
-            aiou += aiou_ * mask_cnt
-
-
-            labels, mask_ids, hidden_states = (forward_output['labels'],
-                                               forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
-                hidden_states[labels >= 0], mask_ids[labels >= 0])
-            losses_dice_phrase.append(loss_dice_phrase)
-            losses_mask_phrase.append(loss_mask_phrase)
-            aious_phrase.append(aiou_phrase)
-            losses_cls_phrase.append(loss_cls_phrase)
-
-        assert mask_cnts > 0
-        loss_dict = {'loss_mask': loss_mask / mask_cnts,
-                     'loss_dice': loss_dice / mask_cnts,
-                     'accuracy': accuracy / mask_cnts,
-                     'aiou': aiou / mask_cnts,
-                     'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
-                     'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
-                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
-                     'aiou_phrase': sum(aious_phrase) / len(data)
-                     }
-
-        return loss_dict
-
     def _compute(self, pred_masks, gt_masks):
         mask_cnt = pred_masks.shape[0]
         loss_dice = self.loss_dice(
@@ -210,88 +169,6 @@ class FrozenLlava(BaseModel):
     @torch.no_grad()
     def predict(self, data_sample):
         return self._forward(data_sample)['pred_masks']
-
-    def gcg_forward(self, data_sample, **kwargs):
-        # for now we implement greedy search only
-        input_ids = data_sample['input_ids'][None].to(self.llava.device)
-        pixel_values = data_sample['pixel_values'][None].to(device=self.llava.device,
-                                                            dtype=self.llava.dtype)
-        attention_mask = torch.ones(input_ids.shape, device=self.llava.device, dtype=torch.bool)
-        output = self.llava(input_ids=input_ids,
-                            pixel_values=pixel_values,
-                            attention_mask=attention_mask,
-                            use_cache=True)
-        image_to_overwrite = output.image_to_overwrite[0]
-        past_key_values = output.past_key_values
-        past_length = past_key_values[0][0].shape[2]
-
-        assert len(image_to_overwrite) == past_length
-
-        logits = output.logits[0, -1]
-        del output
-        input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
-        output = self.llava.generate(
-            input_ids=input_ids,
-            past_key_values=past_key_values,
-            attention_mask=attention_mask,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict_in_generate=True,
-            use_cache=True,
-            **kwargs)
-
-        output_ids = output.sequences[0, :-1]
-        assert input_ids[0] == logits.argmax()
-        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
-        assert len(attentions) == len(output_ids)
-        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
-        num_layers = len(attentions[0])
-        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_to_overwrite]
-                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
-        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
-        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
-                         for layer_id in range(1, 1+num_layers)]
-
-        # do keyword detection
-        text_layer_weights = self.get_text_layer_weights()
-        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
-        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
-
-        key_phrases = self.key_phrase_head(hidden_states)   # num_key_phrases, answer_len
-        if len(key_phrases) == 0:
-            key_phrases = torch.ones((1, len(output_ids)),
-                                     device=self.llava.device, dtype=torch.bool)
-        mask_attentions = []
-        key_phrase_ids = []
-        for key_phrase in key_phrases:
-            if key_phrase.sum() == 0:
-                key_phrase = torch.ones_like(key_phrase)
-            mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions]))
-            key_phrase_ids.append(output_ids[key_phrase])
-        del attentions
-
-        mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-        meta_data = data_sample['meta_data']
-        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
-        mask_attentions = mask_attentions.view(*mask_attentions.shape[:-1], llava_h, llava_w)
-        pred_masks = self.mask_head(mask_attentions)[:, 0]
-        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
-        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
-        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
-        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
-        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
-
-        pred_masks = pred_masks[:, before_height:before_height + mask_h,
-                     before_width:before_width + mask_w].contiguous()
-        height, width = data_sample['height'], data_sample['width']
-        pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
-        pred_masks = pred_masks > 0
-
-        return output_ids, key_phrase_ids, pred_masks
 
 
 class FrozenLlavaSAM(FrozenLlava):
@@ -343,8 +220,15 @@ class FrozenLlavaSAM(FrozenLlava):
         for mask_id in range(len(masks)):
             matched = mask_ids == mask_id
             assert matched.sum() > 0
+            matched_len = matched.sum()
+            if self.merge == 'learn':
+                merge_weights = self.merge_proj(hidden_states[matched])[:, 0].softmax(0)   # matched_len
+                merge_weights = merge_weights.view(1, matched_len, 1, 1)
+            else:
+                merge_weights = None
+
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
+                [self.apply_merge(attn[:, matched], dim=1, weights=merge_weights) for attn in attentions]))
             text_embeds.append(self.text_proj(hidden_states[matched]))
 
         del attentions
@@ -501,8 +385,16 @@ class FrozenLlavaSAM(FrozenLlava):
         for key_phrase in key_phrases:
             if key_phrase.sum() == 0:
                 key_phrase = torch.ones_like(key_phrase)
+
+            matched_len = key_phrase.sum()
+            if self.merge == 'learn':
+                merge_weights = self.merge_proj(hidden_states[key_phrase])[:, 0].softmax(0)   # matched_len
+                merge_weights = merge_weights.view(1, matched_len, 1)
+            else:
+                merge_weights = None
+
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions]))
+                [self.apply_merge(attn[:, key_phrase], dim=1, weights=merge_weights) for attn in attentions]))
             key_phrase_ids.append(output_ids[key_phrase])
             text_embeds.append(self.text_proj(hidden_states[key_phrase]))
         del attentions

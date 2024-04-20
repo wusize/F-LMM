@@ -11,10 +11,11 @@ from xtuner.engine.runner import TrainLoop
 from mmengine.dataset import DefaultSampler
 from src.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
                               concat_datasets, gcg_collate_fn)
-# from src.datasets.png import PNGDataset
-from src.models.llava.modeling_llava import CustomLlavaForConditionalGeneration
-from src.datasets.llava_processors import CustomLlavaImageProcessor
-from src.models.frozen_llava import FrozenLlavaSAM
+from src.datasets.png import PNGDataset
+from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
+from src.datasets.llava_next_processors import CustomLlavaNextImageProcessor
+# from src.models.meta_arch import FrozenLlava
+from src.models.frozen_llava_next import FrozenLlavaNextSAM
 from src.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
 from src.models.segment_modules.sam_wrapper import SAMWrapper
@@ -23,9 +24,11 @@ from mmseg.models.backbones.unet import InterpConv
 from src.models.key_phrase_heads import KeyPhraseHead
 from src.runner import CustomRunner
 
+
 from mmdet.datasets import RefCocoDataset
 from src.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
 from mmdet.datasets.transforms import LoadAnnotations
+
 
 #######################################################################
 #                          PART 1  Settings                           #
@@ -37,7 +40,7 @@ from mmdet.datasets.transforms import LoadAnnotations
 batch_size = 1  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
-max_epochs = 1
+max_epochs = 8
 optim_type = AdamW
 lr = 1e-4
 betas = (0.9, 0.999)
@@ -49,18 +52,16 @@ warmup_ratio = 0.03
 save_steps = 500
 save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 
-
-
 #######################################################################
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 # Model
-prompt_template = PROMPT_TEMPLATE.vicuna
 prompt = "<image>\nPlease give me a description of the image."
-llava_name = 'llava-hf/llava-1.5-7b-hf'
+prompt_template = PROMPT_TEMPLATE.mistral
+llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
 unet = dict(type=UNetHead,
             normalize_input=True,
-            upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
+            upsample_input=64,
             in_channels=2048,
             base_channels=64,
             num_stages=4,
@@ -91,15 +92,16 @@ tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
     pretrained_model_name_or_path=llava_name)
 image_processor = dict(
-    type=CustomLlavaImageProcessor.from_pretrained,
-    pretrained_model_name_or_path='openai/clip-vit-large-patch14-336')
+    type=CustomLlavaNextImageProcessor.from_pretrained,
+    pretrained_model_name_or_path=llava_name)
 
 model = dict(
-    type=FrozenLlavaSAM,
+    type=FrozenLlavaNextSAM,
+    merge='learn',
     sam=dict(type=SAMWrapper,
              use_text=True, use_mask=True, multimask_output=False,
              model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
-    model=dict(type=CustomLlavaForConditionalGeneration.from_pretrained,
+    model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.bfloat16, low_cpu_mem_usage=True),
     mask_head=unet,
@@ -255,8 +257,8 @@ default_hooks = dict(
     checkpoint=dict(
         type=CheckpointHook,
         by_epoch=False,
-        interval=save_steps,
         # save_optimizer=False,
+        interval=save_steps,
         max_keep_ckpts=save_total_limit),
     # set sampler seed in distributed evrionment.
     sampler_seed=dict(type=DistSamplerSeedHook),
