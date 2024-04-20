@@ -33,8 +33,8 @@ from mmdet.datasets.transforms import LoadAnnotations
 #######################################################################
 #                          PART 1  Settings                           #
 #######################################################################
-runner_type = CustomRunner
-find_unused_parameters = True
+# runner_type = CustomRunner
+# find_unused_parameters = True
 
 # Scheduler & Optimizer
 batch_size = 1  # per_device
@@ -256,7 +256,7 @@ default_hooks = dict(
     checkpoint=dict(
         type=CheckpointHook,
         by_epoch=False,
-        save_optimizer=False,
+        # save_optimizer=False,
         interval=save_steps,
         max_keep_ckpts=save_total_limit),
     # set sampler seed in distributed evrionment.
