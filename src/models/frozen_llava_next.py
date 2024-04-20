@@ -157,8 +157,8 @@ class FrozenLlavaNext(BaseModel):
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
         ], dim=1).to(self.mask_head.dtype)
         del attentions_with_coarse, attentions_with_fine
-        if self.training:
-            attention_maps.requires_grad = True
+        # if self.training:
+        #     attention_maps.requires_grad = True
         # print(f"============={attention_maps.dtype}===========", flush=True)
         pred_masks = self.mask_head(attention_maps)[:, 0]
 
@@ -260,8 +260,8 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
                           size=(fine_image_feature_h, fine_image_feature_w), mode='bilinear')
         ], dim=1).to(self.mask_head.dtype)
         del attentions_with_coarse, attentions_with_fine
-        if self.training:
-            attention_maps.requires_grad = True
+        # if self.training:
+        #     attention_maps.requires_grad = True
         # print(f"============={attention_maps.dtype}===========", flush=True)
         pred_masks = self.mask_head(attention_maps)[:, 0]
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)

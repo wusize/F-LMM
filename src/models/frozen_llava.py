@@ -131,8 +131,8 @@ class FrozenLlava(BaseModel):
 
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-        if self.training:
-            mask_attentions.requires_grad = True
+        # if self.training:
+        #     mask_attentions.requires_grad = True
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
@@ -233,8 +233,8 @@ class FrozenLlavaSAM(FrozenLlava):
 
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-        if self.training:
-            mask_attentions.requires_grad = True
+        # if self.training:
+        #     mask_attentions.requires_grad = True
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
