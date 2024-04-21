@@ -34,10 +34,7 @@ class FrozenLlava(BaseModel):
         self.mask_head = BUILDER.build(mask_head)
         self.patch_size = self.llava.config.vision_config.patch_size
         self.merge = merge
-        assert merge in ['mean', 'max', 'learn']
-
-        if merge == 'learn':
-            self.merge_proj = nn.Linear(self.llava.config.text_config.hidden_size,1)
+        assert merge in ['mean', 'max']
 
         self.loss_mask = BUILDER.build(loss_mask)
         self.loss_dice = BUILDER.build(loss_dice)
@@ -53,13 +50,11 @@ class FrozenLlava(BaseModel):
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
 
-    def apply_merge(self, x, dim=1, weights=None):
+    def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
             return x.mean(dim=dim)
         elif self.merge == 'max':
             return x.max(dim=dim).values
-        elif self.merge == 'learn':
-            return (x * weights).sum(dim=dim)
         else:
             raise NotImplementedError
 
@@ -119,15 +114,8 @@ class FrozenLlava(BaseModel):
         for mask_id in range(len(masks)):
             matched = mask_ids == mask_id
             assert matched.sum() > 0
-            matched_len = matched.sum()
-            if self.merge == 'learn':
-                merge_weights = self.merge_proj(hidden_states[matched])[:, 0].softmax(0)   # matched_len
-                merge_weights = merge_weights.view(1, matched_len, 1, 1)
-            else:
-                merge_weights = None
-
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, matched], dim=1, weights=merge_weights) for attn in attentions]))
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
 
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
@@ -220,15 +208,8 @@ class FrozenLlavaSAM(FrozenLlava):
         for mask_id in range(len(masks)):
             matched = mask_ids == mask_id
             assert matched.sum() > 0
-            matched_len = matched.sum()
-            if self.merge == 'learn':
-                merge_weights = self.merge_proj(hidden_states[matched])[:, 0].softmax(0)   # matched_len
-                merge_weights = merge_weights.view(1, matched_len, 1, 1)
-            else:
-                merge_weights = None
-
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, matched], dim=1, weights=merge_weights) for attn in attentions]))
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
             text_embeds.append(self.text_proj(hidden_states[matched]))
 
         del attentions
@@ -385,16 +366,8 @@ class FrozenLlavaSAM(FrozenLlava):
         for key_phrase in key_phrases:
             if key_phrase.sum() == 0:
                 key_phrase = torch.ones_like(key_phrase)
-
-            matched_len = key_phrase.sum()
-            if self.merge == 'learn':
-                merge_weights = self.merge_proj(hidden_states[key_phrase])[:, 0].softmax(0)   # matched_len
-                merge_weights = merge_weights.view(1, matched_len, 1)
-            else:
-                merge_weights = None
-
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, key_phrase], dim=1, weights=merge_weights) for attn in attentions]))
+                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions]))
             key_phrase_ids.append(output_ids[key_phrase])
             text_embeds.append(self.text_proj(hidden_states[key_phrase]))
         del attentions
