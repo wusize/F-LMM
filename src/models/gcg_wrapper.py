@@ -92,6 +92,7 @@ class GCGWrapper(nn.Module):
         last_end = 0
         new_text = ''
         noun_chunks = sorted(noun_chunks, key=lambda x: output_text.find(x))
+        phrases = []
         for noun_chunk in noun_chunks:
             obj_start = output_text.find(noun_chunk)
             if obj_start < last_end:
@@ -100,6 +101,7 @@ class GCGWrapper(nn.Module):
             obj_end = obj_start + len(noun_chunk)
             new_text += f"{output_text[last_end:obj_start].strip()}<mask>{output_text[obj_start:obj_end]}</mask>"
             last_end = obj_end
+            phrases.append(noun_chunk)
 
         output_ids = self.tokenizer.encode(new_text, add_special_tokens=False)
         output_ids = torch.tensor(output_ids, dtype=torch.long)
@@ -124,7 +126,7 @@ class GCGWrapper(nn.Module):
         output_ids = torch.cat(final_output_ids).to(device)
         mask_ids = torch.tensor(mask_ids).to(device)
 
-        return output_ids, mask_ids, output_text, noun_chunks
+        return output_ids, mask_ids, output_text, phrases
 
     def load_pretrained(self, state_dict):
         self.model.load_state_dict(state_dict, strict=False)
