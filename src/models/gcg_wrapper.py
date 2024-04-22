@@ -99,7 +99,6 @@ class GCGWrapper(nn.Module):
             new_text += f"{output_text[last_end:obj_start].strip()}<mask>{output_text[obj_start:obj_end]}</mask>"
             last_end = obj_end
 
-        import pdb; pdb.set_trace()
         output_ids = self.tokenizer.encode(new_text, add_special_tokens=False)
         output_ids = torch.tensor(output_ids, dtype=torch.long)
 
@@ -122,7 +121,6 @@ class GCGWrapper(nn.Module):
 
         output_ids = torch.cat(final_output_ids).to(device)
         mask_ids = torch.tensor(mask_ids).to(device)
-        import pdb; pdb.set_trace()
 
         return output_ids, mask_ids, output_text, noun_chunks
 

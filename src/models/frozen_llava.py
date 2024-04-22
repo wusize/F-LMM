@@ -339,14 +339,12 @@ class FrozenLlavaSAM(FrozenLlava):
             attention_mask=attention_mask,
             use_cache=True,
             **kwargs)[0]   # output sequence
-        import pdb; pdb.set_trace()
         output_ids, mask_ids, caption, phrases = noun_phrase_parser(output)
 
         output = self.llava(input_ids=output_ids[None],
                             past_key_values=past_key_values,
                             output_hidden_states=True,
                             output_attentions=True)
-        import pdb; pdb.set_trace()
         text_layer_weights = self.get_text_layer_weights()
         attentions = [attn[0, ..., image_to_overwrite]
                       for attn in output.attentions]
@@ -362,7 +360,6 @@ class FrozenLlavaSAM(FrozenLlava):
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
             text_embeds.append(self.text_proj(hidden_states[matched]))
         del attentions
-        # import pdb; pdb.set_trace()
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
         meta_data = data_sample['meta_data']
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
@@ -411,7 +408,6 @@ class FrozenLlavaSAM(FrozenLlava):
             output_hidden_states=True,
             return_dict_in_generate=True,
             **kwargs).sequences[0]
-        # import pdb; pdb.set_trace()
 
         output = self.llava(input_ids=input_ids,
                             pixel_values=pixel_values,

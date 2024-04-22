@@ -355,6 +355,7 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         past_key_values = output.past_key_values
         past_length = past_key_values[0][0].shape[2]
         assert len(image_to_overwrite) == past_length
+        image_to_overwrite = torch.where(image_to_overwrite)[0]
         coarse_image_h, coarse_image_w = data_sample['pixel_values'].shape[2:]
         coarse_image_feature_h, coarse_image_feature_w = (
             coarse_image_h // self.patch_size, coarse_image_w // self.patch_size)
@@ -368,30 +369,19 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict_in_generate=True,
             use_cache=True,
-            **kwargs)
-
-        output_ids = output.sequences[0, :-1]
-        assert input_ids[0] == logits.argmax()
-        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
-        assert len(attentions) == len(output_ids)
-        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
-        num_layers = len(attentions[0])
-        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_to_overwrite]
-                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
-        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
-        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2) 
-                         for layer_id in range(1, 1+num_layers)]
-        # do keyword detection
+            **kwargs)[0]
+        output_ids, mask_ids, caption, phrases = noun_phrase_parser(output)
+        output = self.llava(input_ids=output_ids[None],
+                            past_key_values=past_key_values,
+                            output_hidden_states=True,
+                            output_attentions=True)
         text_layer_weights = self.get_text_layer_weights()
-        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
-        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
-
-        import pdb; pdb.set_trace()
-        caption, noun_chunks, positive_output_positions = noun_phrase_parser(output_ids)
+        attentions = [attn[0, ..., image_to_overwrite]
+                      for attn in output.attentions]
+        hidden_states = output.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])    # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)
         attentions_with_coarse = [
             attn[..., :coarse_image_feature_h * coarse_image_feature_w].view(
                 *attn.shape[:-1], coarse_image_feature_h, coarse_image_feature_w
@@ -400,19 +390,19 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             attn[..., coarse_image_feature_h * coarse_image_feature_w:].view(
                 *attn.shape[:-1], fine_image_feature_h, fine_image_feature_w + 1
             )[..., :-1] for attn in attentions]
-        key_phrase_ids = []
         text_embeds = []
         attentions_with_coarse_list = []
         attentions_with_fine_list = []
-        for positive_output_position in positive_output_positions:
+        for mask_id in range(len(phrases)):
+            matched = mask_ids == mask_id
+            assert matched.sum() > 0
             mask_attentions_with_coarse = torch.cat(
-                [self.apply_merge(attn[:, positive_output_position], dim=1) for attn in attentions_with_coarse])
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions_with_coarse])
             mask_attentions_with_fine = torch.cat(
-                [self.apply_merge(attn[:, positive_output_position], dim=1) for attn in attentions_with_fine])
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions_with_fine])
             attentions_with_coarse_list.append(mask_attentions_with_coarse)
             attentions_with_fine_list.append(mask_attentions_with_fine)
-            key_phrase_ids.append(output_ids[positive_output_position])
-            text_embeds.append(self.text_proj(hidden_states[positive_output_position]))
+            text_embeds.append(self.text_proj(hidden_states[matched]))
         del attentions
 
         attentions_with_coarse = torch.stack(attentions_with_coarse_list)
@@ -432,4 +422,4 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
         pred_masks = pred_masks > 0
 
-        return caption, noun_chunks, pred_masks
+        return caption, phrases, pred_masks
