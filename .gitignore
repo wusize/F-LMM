@@ -125,3 +125,4 @@ batchscript-*
 .idea/*.xml
 .idea/
 *.pdf
+checkpoints/
