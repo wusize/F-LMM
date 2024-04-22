@@ -16,7 +16,7 @@ if __name__ == '__main__':
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default='', type=str)
     parser.add_argument('--save_path', default='', type=str)
-    parser.add_argument('--max_new_tokens', default=100, type=int)
+    parser.add_argument('--max_new_tokens', default=512, type=int)
     args = parser.parse_args()
 
     ### Initialize accelerator
@@ -27,7 +27,6 @@ if __name__ == '__main__':
     messages = gather_object(message)
     # output the messages only on the main process with accelerator.print()
     accelerator.print(messages)
-
 
     gcg_wrapper = GCGWrapper(config_file=args.config, max_new_tokens=args.max_new_tokens)
 
