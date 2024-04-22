@@ -432,7 +432,7 @@ class FrozenFuyuSAM(FrozenFuyu):
         return loss_dict
 
     @torch.no_grad()
-    def gcg_forward(self, data_sample, **kwargs):
+    def gcg_forward(self, data_sample, noun_phrase_parser, **kwargs):
         input_ids = data_sample['input_ids'].to(self.fuyu.device)
         image_tensor = data_sample['pixel_values'].to(device=self.fuyu.device, dtype=self.fuyu.dtype)
         image_patches, image_patches_indices, image_token_ids = self._patchify(image_tensor[None])
@@ -483,20 +483,16 @@ class FrozenFuyuSAM(FrozenFuyu):
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
         hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
 
-        key_phrases = self.key_phrase_head(hidden_states)  # num_key_phrases, answer_len
-        if len(key_phrases) == 0:
-            key_phrases = torch.ones((1, len(output_ids)),
-                                     device=self.fuyu.device, dtype=torch.bool)
+        import pdb; pdb.set_trace()
+        caption, noun_chunks, positive_output_positions = noun_phrase_parser(output_ids)
         mask_attentions = []
         key_phrase_ids = []
         text_embeds = []
-        for key_phrase in key_phrases:
-            if key_phrase.sum() == 0:
-                key_phrase = torch.ones_like(key_phrase)
+        for positive_output_position in positive_output_positions:
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions]))
-            key_phrase_ids.append(output_ids[key_phrase])
-            text_embeds.append(self.text_proj(hidden_states[key_phrase]))
+                [self.apply_merge(attn[:, positive_output_position], dim=1) for attn in attentions]))
+            key_phrase_ids.append(output_ids[positive_output_position])
+            text_embeds.append(self.text_proj(hidden_states[positive_output_position]))
         del attentions
 
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
@@ -518,4 +514,4 @@ class FrozenFuyuSAM(FrozenFuyu):
         pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
         pred_masks = pred_masks > 0
 
-        return output_ids, key_phrase_ids, pred_masks
+        return caption, noun_chunks, pred_masks
