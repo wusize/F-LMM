@@ -4,7 +4,6 @@ import torch.nn.functional as F
 from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 from xtuner.utils.constants import IGNORE_INDEX
-from xtuner.model.utils import guess_load_checkpoint
 
 
 @torch.no_grad()
@@ -24,7 +23,6 @@ class FrozenFuyu(BaseModel):
                  merge='mean',
                  loss_mask=None,
                  loss_dice=None,
-                 pretrained=None,
                  key_phrase_head=None):
         super().__init__()
         self.fuyu = BUILDER.build(model)
@@ -47,9 +45,6 @@ class FrozenFuyu(BaseModel):
             torch.ones(self.fuyu.config.num_hidden_layers))
         key_phrase_head.update(in_channels=self.fuyu.config.hidden_size)
         self.key_phrase_head = BUILDER.build(key_phrase_head)
-
-        if pretrained is not None:
-            _ = self.load_state_dict(guess_load_checkpoint(pretrained), strict=False)
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
@@ -150,56 +145,6 @@ class FrozenFuyu(BaseModel):
                       labels=labels, mask_ids=mask_ids, hidden_states=hidden_states)
 
         return output
-
-    def compute_loss(self, data):
-        mask_cnts = 0
-        loss_dice = 0
-        loss_mask = 0
-        accuracy = 0
-        aiou = 0
-
-        losses_dice_phrase = []
-        losses_mask_phrase = []
-        losses_cls_phrase = []
-        aious_phrase = []
-
-        for data_sample in data:
-            forward_output = self._forward(data_sample)
-            pred_masks = forward_output['pred_masks']
-            masks = data_sample['masks'].to(self.fuyu.device)
-            gt_masks = F.interpolate(masks[None].float(),
-                                     size=pred_masks.shape[-2:])[0].to(pred_masks)
-            mask_cnt = pred_masks.shape[0]
-            assert pred_masks.shape == gt_masks.shape
-            mask_cnts += mask_cnt
-
-            loss_dice_, loss_mask_, accuracy_, aiou_ = self._compute(pred_masks, gt_masks)
-            loss_dice += loss_dice_ * mask_cnt
-            loss_mask += loss_mask_ * mask_cnt
-            accuracy += accuracy_ * mask_cnt
-            aiou += aiou_ * mask_cnt
-
-            labels, mask_ids, hidden_states = (forward_output['labels'],
-                                               forward_output['mask_ids'], forward_output['hidden_states'])
-            loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
-                hidden_states[labels >= 0], mask_ids[labels >= 0])
-            losses_dice_phrase.append(loss_dice_phrase)
-            losses_mask_phrase.append(loss_mask_phrase)
-            aious_phrase.append(aiou_phrase)
-            losses_cls_phrase.append(loss_cls_phrase)
-
-        assert mask_cnts > 0
-        loss_dict = {'loss_mask': loss_mask / mask_cnts,
-                     'loss_dice': loss_dice / mask_cnts,
-                     'accuracy': accuracy / mask_cnts,
-                     'aiou': aiou / mask_cnts,
-                     'loss_dice_phrase': sum(losses_dice_phrase) / len(data),
-                     'loss_mask_phrase': sum(losses_mask_phrase) / len(data),
-                     'loss_cls_phrase': sum(losses_cls_phrase) / len(data),
-                     'aiou_phrase': sum(aious_phrase) / len(data)
-                     }
-
-        return loss_dict
 
     def _compute(self, pred_masks, gt_masks):
         mask_cnt = pred_masks.shape[0]
@@ -334,13 +279,10 @@ class FrozenFuyu(BaseModel):
 
 class FrozenFuyuSAM(FrozenFuyu):
     def __init__(self, sam, *args, **kwargs):
-        pretrained = kwargs.pop('pretrained', None)
         super().__init__(*args, **kwargs)
         self.sam = BUILDER.build(sam)
         self.text_proj = nn.Linear(self.fuyu.config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
-        if pretrained is not None:
-            _ = self.load_state_dict(guess_load_checkpoint(pretrained), strict=False)
 
     def _forward(self, data_sample):
         # import pdb; pdb.set_trace()
