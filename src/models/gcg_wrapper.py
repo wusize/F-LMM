@@ -111,7 +111,7 @@ class GCGWrapper(nn.Module):
         mask_start_ids = torch.where(output_ids == self.mask_start_id)[0]
         mask_end_ids = torch.where(output_ids == self.mask_end_id)[0]
         assert len(mask_end_ids) == len(mask_start_ids)
-        assert len(mask_end_ids) == len(noun_chunks)
+        assert len(mask_end_ids) == len(phrases)
 
         last_id = 0
         for mask_id, (mask_start_id, mask_end_id) in enumerate(zip(mask_start_ids, mask_end_ids)):
