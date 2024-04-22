@@ -23,9 +23,9 @@ class GCGEvalDataset(Dataset):
                  ceph_path=None, local_path=None, prompt_template=None,
                  prompt='<image>\nPlease give me a detailed description of the image.'):
         super().__init__()
-        prompt += ("If there are multiple instances of a certain object category, "
-                   "you can refer to them as object-1, object-2, object-3, etc. "
-                   "For example, if there are two persons, you can refer to them as person-1, person-2.")
+        # prompt += ("If there are multiple instances of a certain object category, "
+        #            "you can refer to them as object-1, object-2, object-3, etc. "
+        #            "For example, if there are two persons, you can refer to them as person-1, person-2.")
         self.ceph_path = ceph_path
         self.local_path = local_path
         self.FILE_CLIENT = None

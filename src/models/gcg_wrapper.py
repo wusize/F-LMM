@@ -79,7 +79,7 @@ class GCGWrapper(nn.Module):
             word = self.tokenizer.decode(output_id)
             str_positions2output_positions += [output_position] * len(word)
             caption += word
-
+        import pdb; pdb.set_trace()
         doc = self.nlp(caption)
         noun_chunks = list(set(chunk.text for chunk in doc.noun_chunks))
         if len(noun_chunks) == 0:
@@ -96,10 +96,11 @@ class GCGWrapper(nn.Module):
                     )
                 )
             )
-
+        import pdb; pdb.set_trace()
         for special_token in self.tokenizer.all_special_tokens:
             caption = caption.replace(special_token, '')
             noun_chunks = [noun_chunk.replace(special_token, '') for noun_chunk in noun_chunks]
+        import pdb; pdb.set_trace()
 
         return caption, noun_chunks, positive_output_positions
 
