@@ -70,39 +70,59 @@ class GCGWrapper(nn.Module):
             self.tokenizer.eos_token_id,
         )
         self.nlp = spacy.load("en_core_web_sm")
+        special_tokens_dict = {'additional_special_tokens': ['<mask>', '</mask>']}
+        num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+        assert num_added_toks == 2
+
+    @property
+    def mask_start_id(self):
+        return self.tokenizer.added_tokens_encoder['<mask>']
+
+    @property
+    def mask_end_id(self):
+        return self.tokenizer.added_tokens_encoder['</mask>']
 
     def extract_noun_phrases(self, output_ids, ):
-        import pdb; pdb.set_trace()
-        str_positions2output_positions = []
-        caption = ''
-        for output_position, output_id in enumerate(output_ids):
-            word = self.tokenizer.decode(output_id)
-            str_positions2output_positions += [output_position] * (len(word) + 1)
-            caption += (word + ' ')
-        import pdb; pdb.set_trace()
-        doc = self.nlp(caption)
+        device = output_ids.device
+        output_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+        doc = self.nlp(output_text)
         noun_chunks = list(set(chunk.text for chunk in doc.noun_chunks))
         if len(noun_chunks) == 0:
-            noun_chunks = [caption]
-
-        positive_output_positions = []
+            noun_chunks = [output_text]
+        last_end = 0
+        new_text = ''
         for noun_chunk in noun_chunks:
-            start_str_position = caption.find(noun_chunk)
-            positive_output_positions.append(
-                list(
-                    set(
-                        str_positions2output_positions[str_position]
-                        for str_position in range(start_str_position, start_str_position+len(noun_chunk))
-                    )
-                )
-            )
+            obj_start = output_text.find(noun_chunk)
+            obj_end = obj_start + len(noun_chunk)
+            new_text += f"{output_text[last_end:obj_start].strip()}<mask>{output_text[obj_start:obj_end]}</mask>"
+            last_end = obj_end
+
         import pdb; pdb.set_trace()
-        for special_token in self.tokenizer.all_special_tokens:
-            caption = caption.replace(special_token, '')
-            noun_chunks = [noun_chunk.replace(special_token, '') for noun_chunk in noun_chunks]
+        output_ids = self.tokenizer.encode(new_text, add_special_tokens=False)
+        output_ids = torch.tensor(output_ids, dtype=torch.long)
+
+        final_output_ids = []
+        mask_ids = []
+        mask_start_ids = torch.where(output_ids == self.mask_start_id)[0]
+        mask_end_ids = torch.where(output_ids == self.mask_end_id)[0]
+        assert len(mask_end_ids) == len(mask_start_ids)
+        assert len(mask_end_ids) == len(noun_chunks)
+
+        last_id = 0
+        for mask_id, (mask_start_id, mask_end_id) in enumerate(zip(mask_start_ids, mask_end_ids)):
+            if last_id < mask_start_id:
+                final_output_ids.append(output_ids[last_id:mask_start_id])
+                mask_ids += [-1] * (mask_start_id - last_id)
+
+            final_output_ids.append(output_ids[mask_start_id+1:mask_end_id])
+            mask_ids += [mask_id] * (mask_end_id-1-mask_start_id)
+            last_id = mask_end_id + 1
+
+        output_ids = torch.cat(final_output_ids).to(device)
+        mask_ids = torch.tensor(mask_ids).to(device)
         import pdb; pdb.set_trace()
 
-        return caption, noun_chunks, positive_output_positions
+        return output_ids, mask_ids, output_text, noun_chunks
 
     def load_pretrained(self, state_dict):
         self.model.load_state_dict(state_dict, strict=False)

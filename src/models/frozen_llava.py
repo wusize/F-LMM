@@ -324,48 +324,43 @@ class FrozenLlavaSAM(FrozenLlava):
         past_length = past_key_values[0][0].shape[2]
 
         assert len(image_to_overwrite) == past_length
+        image_to_overwrite = torch.where(image_to_overwrite)[0]
 
         logits = output.logits[0, -1]
         del output
         input_ids = logits.argmax().view(1, 1)
         attention_mask = torch.ones((1, past_length+1), device=self.llava.device, dtype=torch.bool)
+
+        # TODO: extract noun phrases in the output ids directly. For now, we postprocess the output text and
+        # TODO: feed it back
         output = self.llava.generate(
             input_ids=input_ids,
             past_key_values=past_key_values,
             attention_mask=attention_mask,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict_in_generate=True,
             use_cache=True,
-            **kwargs)
+            **kwargs)[0]   # output sequence
+        import pdb; pdb.set_trace()
+        output_ids, mask_ids, caption, phrases = noun_phrase_parser(output)
 
-        output_ids = output.sequences[0, :-1]   # the last token was not passed through the model
-        assert input_ids[0] == logits.argmax()
-        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
-        assert len(attentions) == len(output_ids)
-        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
-        num_layers = len(attentions[0])
-        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_to_overwrite]
-                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
-        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
-        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
-                         for layer_id in range(1, 1+num_layers)]
-        # do keyword detection
+        output = self.llava(input_ids=output_ids[None],
+                            past_key_values=past_key_values,
+                            output_hidden_states=True,
+                            output_attentions=True)
+        import pdb; pdb.set_trace()
         text_layer_weights = self.get_text_layer_weights()
+        attentions = [attn[0, ..., image_to_overwrite]
+                      for attn in output.attentions]
+        hidden_states = output.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
         hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
-
-        # key_phrases = self.key_phrase_head(hidden_states)  # num_key_phrases, answer_len
-        import pdb; pdb.set_trace()
-        caption, noun_chunks, positive_output_positions = noun_phrase_parser(output_ids)
         mask_attentions = []
-        key_phrase_ids = []
         text_embeds = []
-        for positive_output_position in positive_output_positions:
+        for mask_id in range(len(phrases)):
+            matched = mask_ids == mask_id
+            assert matched.sum() > 0
             mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, positive_output_position], dim=1) for attn in attentions]))
-            key_phrase_ids.append(output_ids[positive_output_position])
-            text_embeds.append(self.text_proj(hidden_states[positive_output_position]))
+                [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
+            text_embeds.append(self.text_proj(hidden_states[matched]))
         del attentions
         # import pdb; pdb.set_trace()
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
@@ -389,7 +384,7 @@ class FrozenLlavaSAM(FrozenLlava):
         pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
         pred_masks = pred_masks > 0
 
-        return caption, noun_chunks, pred_masks
+        return caption, phrases, pred_masks
 
     @torch.no_grad()
     def caption_forward(self, data_sample, **kwargs):
