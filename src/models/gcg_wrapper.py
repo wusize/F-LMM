@@ -110,6 +110,7 @@ class GCGWrapper(nn.Module):
     def forward(self, data_sample):
         caption, phrases, pred_masks = self.model.gcg_forward(
             data_sample,
+            self.extract_noun_phrases,
             generation_config=self.gen_config,
             stopping_criteria=self.stop_criteria
         )
