@@ -94,6 +94,8 @@ class GCGWrapper(nn.Module):
         noun_chunks = sorted(noun_chunks, key=lambda x: output_text.find(x))
         for noun_chunk in noun_chunks:
             obj_start = output_text.find(noun_chunk)
+            if obj_start < last_end:
+                import pdb; pdb.set_trace()
             assert obj_start >= last_end
             obj_end = obj_start + len(noun_chunk)
             new_text += f"{output_text[last_end:obj_start].strip()}<mask>{output_text[obj_start:obj_end]}</mask>"
