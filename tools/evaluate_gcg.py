@@ -34,15 +34,15 @@ def parse_args():
 
 
 # Load pre-trained model tokenizer and model for evaluation
-tokenizer = AutoTokenizer.from_pretrained("bert-base-uncased")
-model = AutoModel.from_pretrained("bert-base-uncased")
+tokenizer = AutoTokenizer.from_pretrained("checkpoints/bert-base-uncased")
+model = AutoModel.from_pretrained("checkpoints/bert-base-uncased").cuda()
 
 
 def get_bert_embedding(text):
-    inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True)
+    inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True).cuda()
     outputs = model(**inputs)
     # Use the mean of the last hidden states as sentence embedding
-    sentence_embedding = torch.mean(outputs.last_hidden_state[0], dim=0).detach().numpy()
+    sentence_embedding = torch.mean(outputs.last_hidden_state[0], dim=0).detach().cpu().numpy()
 
     return sentence_embedding
 

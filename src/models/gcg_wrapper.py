@@ -94,7 +94,7 @@ class GCGWrapper(nn.Module):
                                       'him', 'a', 'what', 'which', 'whose', 'who']:
                 continue
             keep = True
-            for j in range(len(noun_chunks)):
+            for j in range(len(noun_chunks)):   # de-duplicate
                 if i != j and noun_chunk in noun_chunks[j]:
                     if len(noun_chunk) < len(noun_chunks[j]) or i > j:
                         keep = False
