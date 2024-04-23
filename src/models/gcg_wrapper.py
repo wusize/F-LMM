@@ -94,6 +94,8 @@ class GCGWrapper(nn.Module):
         noun_chunks = sorted(noun_chunks, key=lambda x: output_text.find(x))
         phrases = []
         for noun_chunk in noun_chunks:
+            if 'image' in noun_chunk.lower():
+                continue
             obj_start = output_text.find(noun_chunk)
             if obj_start < last_end:
                 continue
