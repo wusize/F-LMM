@@ -262,13 +262,8 @@ def main():
     # # -------------------------------#
     # # 2. Evaluate Caption Quality
     coco_cap_gt = COCO(gt_cap_path)
-    coco_cap_result = coco_cap_gt.loadRes(cap_pred_save_path)
-    # create coco_eval object by taking coco and coco_result
-    coco_eval = COCOEvalCap(coco_cap_gt, coco_cap_result)
-    coco_eval.params['image_id'] = coco_cap_result.getImgIds()
-    coco_eval.evaluate()
-    for metric, score in coco_eval.eval.items():
-        print(f'{metric}: {score:.3f}')
+
+
 
     # # -------------------------------#
     # 3. Evaluate Mask Mean MIoU
@@ -279,6 +274,18 @@ def main():
     # 4. Evaluate Recall
     evaluate_recall_with_mapping(coco_gt, coco_cap_gt, all_images_ids, pred_save_path, cap_pred_save_path,
                                  iou_threshold=0.5, text_sim_threshold=0.5)
+
+
+
+    coco_cap_result = coco_cap_gt.loadRes(cap_pred_save_path)
+    # create coco_eval object by taking coco and coco_result
+    coco_eval = COCOEvalCap(coco_cap_gt, coco_cap_result)
+    coco_eval.params['image_id'] = coco_cap_result.getImgIds()
+    coco_eval.evaluate()
+    for metric, score in coco_eval.eval.items():
+        print(f'{metric}: {score:.3f}')
+
+
 
 
 if __name__ == "__main__":
