@@ -17,7 +17,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', default='', type=str)
     parser.add_argument('--save_path', default='', type=str)
     parser.add_argument('--prompt',
-                        default='<image>\nPlease give me a very brief description of the image.', type=str)
+                        default='<image>\nBriefly describe the objects that appear in this image.', type=str)
     parser.add_argument('--max_new_tokens', default=100, type=int)
     args = parser.parse_args()
 
