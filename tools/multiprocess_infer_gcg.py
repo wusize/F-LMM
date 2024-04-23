@@ -16,7 +16,9 @@ if __name__ == '__main__':
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default='', type=str)
     parser.add_argument('--save_path', default='', type=str)
-    parser.add_argument('--max_new_tokens', default=512, type=int)
+    parser.add_argument('--prompt',
+                        default='<image>\nPlease give me a very brief description of the image.', type=str)
+    parser.add_argument('--max_new_tokens', default=100, type=int)
     args = parser.parse_args()
 
     ### Initialize accelerator
@@ -42,10 +44,6 @@ if __name__ == '__main__':
     gcg_wrapper = gcg_wrapper.to(device=accelerator.device)
     print(f"Finished moving model to device: {accelerator.device}, time used: {time() - tik}", flush=True)
     gcg_wrapper.eval()
-    prompt = ('Please give me a brief description of the image. Make sure the objects that appear in the '
-              'image are included in this brief description.')
-    if '<image>' in gcg_wrapper.config.prompt:
-        prompt = f'<image>\n{prompt}'
     for sub_set in ['val', 'test']:
         if accelerator.is_main_process:
             os.makedirs(f'{args.save_path}/{sub_set}', exist_ok=True)
@@ -57,7 +55,7 @@ if __name__ == '__main__':
                      ceph_path='BJ17:S3://wusize/GranDf_HA_images/val_test',
                      local_path='data/GranDf_HA_images/val_test',
                      prompt_template=gcg_wrapper.config.prompt_template,
-                     prompt=prompt)
+                     prompt=args.prompt)
 
         data_ids = list(range(len(dataset)))
         # sync GPUs and start the timer
