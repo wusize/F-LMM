@@ -82,6 +82,28 @@ class GCGWrapper(nn.Module):
     def mask_end_id(self):
         return self.tokenizer.added_tokens_encoder['</mask>']
 
+    @staticmethod
+    def process_noun_chunks(noun_chunks):
+        new_noun_chunks = []
+        for i in range(len(noun_chunks)):
+            noun_chunk = noun_chunks[i]
+            if 'image' in noun_chunk.lower():
+                continue
+            if noun_chunk.lower() in ['it', 'this', 'that', 'those', 'these', 'them',
+                                      'he', 'she', 'you', 'i', 'they', 'me', 'her',
+                                      'him', 'a', 'what', 'which', 'whose', 'who']:
+                continue
+            keep = True
+            for j in range(len(noun_chunks)):
+                if i != j and noun_chunk in noun_chunks[j]:
+                    if len(noun_chunk) < len(noun_chunks[j]) or i > j:
+                        keep = False
+                        break
+            if keep:
+                new_noun_chunks.append(noun_chunk)
+
+        return new_noun_chunks
+
     def extract_noun_phrases(self, output_ids, ):
         device = output_ids.device
         output_text = self.tokenizer.decode(output_ids, skip_special_tokens=True)
@@ -91,11 +113,10 @@ class GCGWrapper(nn.Module):
             noun_chunks = [output_text]
         last_end = 0
         new_text = ''
+        noun_chunks = self.process_noun_chunks(noun_chunks)
         noun_chunks = sorted(noun_chunks, key=lambda x: output_text.find(x))
         phrases = []
         for noun_chunk in noun_chunks:
-            if 'image' in noun_chunk.lower():
-                continue
             obj_start = output_text.find(noun_chunk)
             if obj_start < last_end:
                 continue
