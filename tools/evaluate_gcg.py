@@ -120,10 +120,17 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
     ious = compute_iou_matrix(gt_masks, pred_masks)
 
     text_sims = np.zeros((len(gt_labels), len(dt_labels)))
+
+    # todo: re-write
+    gt_labels_embeds = np.stack([get_bert_embedding(gt_label) for gt_label in gt_labels], axis=0)
+    dt_labels_embeds = np.stack([get_bert_embedding(dt_label) for dt_label in dt_labels], axis=0)
+
+    text_sims = cosine_similarity(gt_labels_embeds, dt_labels_embeds)
+
     # import pdb; pdb.set_trace()
-    for i, gt_label in enumerate(gt_labels):
-        for j, dt_label in enumerate(dt_labels):
-            text_sims[i, j] = text_similarity_bert(gt_label, dt_label)
+    # for i, gt_label in enumerate(gt_labels):
+    #     for j, dt_label in enumerate(dt_labels):
+    #         text_sims[i, j] = text_similarity_bert(gt_label, dt_label)
 
     # Find one-to-one matches satisfying both IoU and text similarity thresholds
     while ious.size > 0:
