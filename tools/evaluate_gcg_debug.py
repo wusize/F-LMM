@@ -1,8 +1,8 @@
 import os
 import json
 import torch
-import argparse
 import numpy as np
+import argparse
 from tqdm import tqdm
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
@@ -18,6 +18,7 @@ def compute_iou(mask1, mask2):
     iou = np.sum(intersection) / np.sum(union)
 
     return iou
+
 
 
 def parse_args():
@@ -39,8 +40,9 @@ model = AutoModel.from_pretrained("checkpoints/bert-base-uncased").cuda()
 
 
 def get_bert_embedding(text):
-    inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True).cuda()
-    outputs = model(**inputs)
+    # import pdb; pdb.set_trace()
+    inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True)
+    outputs = model(**{k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()})
     # Use the mean of the last hidden states as sentence embedding
     sentence_embedding = torch.mean(outputs.last_hidden_state[0], dim=0).detach().cpu().numpy()
 
@@ -118,7 +120,7 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
     ious = compute_iou_matrix(gt_masks, pred_masks)
 
     text_sims = np.zeros((len(gt_labels), len(dt_labels)))
-
+    # import pdb; pdb.set_trace()
     for i, gt_label in enumerate(gt_labels):
         for j, dt_label in enumerate(dt_labels):
             text_sims[i, j] = text_similarity_bert(gt_label, dt_label)
@@ -147,40 +149,39 @@ def evaluate_recall_with_mapping(coco_gt, coco_cap_gt, image_ids, pred_save_path
 
     true_positives = 0
     actual_positives = 0
-
+    # import pdb; pdb.set_trace()
     for image_id in tqdm(image_ids):
-        try:
-            # gt_ann_ids = coco_gt.getAnnIds(imgIds=image_id, iscrowd=None)
-            matching_anns = [ann for ann in coco_gt.anns.values() if ann['image_id'] == image_id]
-            gt_ann_ids = [ann['id'] for ann in matching_anns]
-            gt_anns = coco_gt.loadAnns(gt_ann_ids)
+        # gt_ann_ids = coco_gt.getAnnIds(imgIds=image_id, iscrowd=None)
+        matching_anns = [ann for ann in coco_gt.anns.values() if ann['image_id'] == image_id]
+        gt_ann_ids = [ann['id'] for ann in matching_anns]
+        gt_anns = coco_gt.loadAnns(gt_ann_ids)
 
-            # dt_ann_ids = coco_dt.getAnnIds(imgIds=image_id, iscrowd=None)
-            matching_anns = [ann for ann in coco_dt.anns.values() if ann['image_id'] == image_id]
-            dt_ann_ids = [ann['id'] for ann in matching_anns]
-            dt_anns = coco_dt.loadAnns(dt_ann_ids)
+        # dt_ann_ids = coco_dt.getAnnIds(imgIds=image_id, iscrowd=None)
+        matching_anns = [ann for ann in coco_dt.anns.values() if ann['image_id'] == image_id]
+        dt_ann_ids = [ann['id'] for ann in matching_anns]
+        dt_anns = coco_dt.loadAnns(dt_ann_ids)
 
-            # gt_cap_ann_ids = coco_cap_gt.getAnnIds(imgIds=image_id)
-            matching_anns = [ann for ann in coco_cap_gt.anns.values() if ann['image_id'] == image_id]
-            gt_cap_ann_ids = [ann['id'] for ann in matching_anns]
-            gt_cap_ann = coco_cap_gt.loadAnns(gt_cap_ann_ids)[0]
+        # gt_cap_ann_ids = coco_cap_gt.getAnnIds(imgIds=image_id)
+        matching_anns = [ann for ann in coco_cap_gt.anns.values() if ann['image_id'] == image_id]
+        gt_cap_ann_ids = [ann['id'] for ann in matching_anns]
+        gt_cap_ann = coco_cap_gt.loadAnns(gt_cap_ann_ids)[0]
 
-            # dt_cap_ann_ids = coco_cap_dt.getAnnIds(imgIds=image_id)
-            matching_anns = [ann for ann in coco_cap_dt.anns.values() if ann['image_id'] == image_id]
-            dt_cap_ann_ids = [ann['id'] for ann in matching_anns]
-            dt_cap_ann = coco_cap_dt.loadAnns(dt_cap_ann_ids)[0]
+        # dt_cap_ann_ids = coco_cap_dt.getAnnIds(imgIds=image_id)
+        matching_anns = [ann for ann in coco_cap_dt.anns.values() if ann['image_id'] == image_id]
+        dt_cap_ann_ids = [ann['id'] for ann in matching_anns]
+        dt_cap_ann = coco_cap_dt.loadAnns(dt_cap_ann_ids)[0]
 
-            gt_labels = gt_cap_ann['labels']
-            dt_labels = dt_cap_ann['labels']
+        gt_labels = gt_cap_ann['labels']
+        dt_labels = dt_cap_ann['labels']
 
-            actual_positives += len(gt_labels)
+        actual_positives += len(gt_labels)
+        if len(gt_labels) == 0 or len(dt_labels) == 0:
+            import pdb; pdb.set_trace()
 
-            # Find best matching pairs
-            best_matches = find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, text_sim_threshold)
-
-            true_positives += len(best_matches)
-        except Exception as e:
-            print(e)
+        # Find best matching pairs
+        # best_matches = find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, text_sim_threshold)
+        #
+        # true_positives += len(best_matches)
 
     recall = true_positives / actual_positives if actual_positives > 0 else 0
 
@@ -243,30 +244,11 @@ def main():
     # Save gcg_caption_coco_predictions
     with open(cap_pred_save_path, 'w') as f:
         json.dump(coco_cap_pred_file, f)
-
-    # # -------------------------------#
-    # 1. Evaluate AP
-    # Calculate mask mAP
-    # Load the ground truth and predictions in COCO format
-    coco_gt = COCO(gt_mask_path)
-    coco_dt = coco_gt.loadRes(pred_save_path)  # load predictions
-    # Initialize COCOEval and specify the metric you want to use
-    coco_eval = COCOeval(coco_gt, coco_dt, "segm")  # "segm" for segmentation
-    # Evaluate on a specific category
-    coco_eval.params.catIds = [1]  # your category ID
-    # Evaluate
-    coco_eval.evaluate()
-    coco_eval.accumulate()
-    coco_eval.summarize()
-
-    # # -------------------------------#
-    # 3. Evaluate Mask Mean MIoU
+    coco_cap_gt = COCO(gt_cap_path)
     coco_gt = COCO(gt_mask_path)  # Load ground truth annotations
-    evaluate_mask_miou(coco_gt, all_images_ids, pred_save_path)
 
     # # -------------------------------#
     # 4. Evaluate Recall
-    coco_cap_gt = COCO(gt_cap_path)
     evaluate_recall_with_mapping(coco_gt, coco_cap_gt, all_images_ids, pred_save_path, cap_pred_save_path,
                                  iou_threshold=0.5, text_sim_threshold=0.5)
 
