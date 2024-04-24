@@ -40,9 +40,9 @@ model = AutoModel.from_pretrained("checkpoints/bert-base-uncased").cuda()
 
 
 def get_bert_embedding(text):
-    import pdb; pdb.set_trace()
-    inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True).cuda()
-    outputs = model(**inputs)
+    # import pdb; pdb.set_trace()
+    inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True)
+    outputs = model(**{k: v.cuda() if isinstance(v, torch.Tensor) else v for k, v in inputs.items()})
     # Use the mean of the last hidden states as sentence embedding
     sentence_embedding = torch.mean(outputs.last_hidden_state[0], dim=0).detach().cpu().numpy()
 
@@ -120,7 +120,7 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
     ious = compute_iou_matrix(gt_masks, pred_masks)
 
     text_sims = np.zeros((len(gt_labels), len(dt_labels)))
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     for i, gt_label in enumerate(gt_labels):
         for j, dt_label in enumerate(dt_labels):
             text_sims[i, j] = text_similarity_bert(gt_label, dt_label)
@@ -149,7 +149,7 @@ def evaluate_recall_with_mapping(coco_gt, coco_cap_gt, image_ids, pred_save_path
 
     true_positives = 0
     actual_positives = 0
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     for image_id in tqdm(image_ids):
         # gt_ann_ids = coco_gt.getAnnIds(imgIds=image_id, iscrowd=None)
         matching_anns = [ann for ann in coco_gt.anns.values() if ann['image_id'] == image_id]
@@ -257,7 +257,7 @@ def main():
     coco_eval.evaluate()
     coco_eval.accumulate()
     coco_eval.summarize()
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     # # -------------------------------#
     # # 2. Evaluate Caption Quality
@@ -269,13 +269,13 @@ def main():
     coco_eval.evaluate()
     for metric, score in coco_eval.eval.items():
         print(f'{metric}: {score:.3f}')
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     # # -------------------------------#
     # 3. Evaluate Mask Mean MIoU
     coco_gt = COCO(gt_mask_path)  # Load ground truth annotations
     evaluate_mask_miou(coco_gt, all_images_ids, pred_save_path)
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
 
     # # -------------------------------#
     # 4. Evaluate Recall
