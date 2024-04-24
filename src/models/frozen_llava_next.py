@@ -23,7 +23,7 @@ class FrozenLlavaNext(BaseModel):
                  loss_mask=None,
                  loss_dice=None,
                  pretrained=None,
-                 key_phrase_head=None):
+                 **kwargs):
         super().__init__()
         self.llava = BUILDER.build(model)
         self.llava.requires_grad_(False)
@@ -41,8 +41,6 @@ class FrozenLlavaNext(BaseModel):
 
         self.text_layer_weights = nn.Parameter(
             torch.ones(self.llava.config.text_config.num_hidden_layers))
-        key_phrase_head.update(in_channels=self.llava.config.text_config.hidden_size)
-        self.key_phrase_head = BUILDER.build(key_phrase_head)
 
         if pretrained is not None:
             _ = self.load_state_dict(guess_load_checkpoint(pretrained), strict=False)
@@ -261,11 +259,6 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
         sam_accuracy = 0
         sam_aiou = 0
 
-        # losses_dice_phrase = []
-        # losses_mask_phrase = []
-        # losses_cls_phrase = []
-        # aious_phrase = []
-
         for data_sample in data:
             forward_output = self._forward(data_sample)
             pred_masks, sam_pred_masks = forward_output['pred_masks'], forward_output['sam_pred_masks']
@@ -289,15 +282,6 @@ class FrozenLlavaNextSAM(FrozenLlavaNext):
             sam_loss_mask += sam_loss_mask_ * mask_cnt
             sam_accuracy += sam_accuracy_ * mask_cnt
             sam_aiou += sam_aiou_ * mask_cnt
-
-            # labels, mask_ids, hidden_states = (forward_output['labels'],
-            #                                    forward_output['mask_ids'], forward_output['hidden_states'])
-            # loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
-            #     hidden_states[labels >= 0], mask_ids[labels >= 0])
-            # losses_dice_phrase.append(loss_dice_phrase)
-            # losses_mask_phrase.append(loss_mask_phrase)
-            # losses_cls_phrase.append(loss_cls_phrase)
-            # aious_phrase.append(aiou_phrase)
 
         assert mask_cnts > 0
         loss_dict = {'loss_mask': loss_mask / mask_cnts,

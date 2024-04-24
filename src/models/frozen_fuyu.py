@@ -23,7 +23,7 @@ class FrozenFuyu(BaseModel):
                  merge='mean',
                  loss_mask=None,
                  loss_dice=None,
-                 key_phrase_head=None):
+                 **kwargs):
         super().__init__()
         self.fuyu = BUILDER.build(model)
         self.fuyu.requires_grad_(False)
@@ -43,8 +43,6 @@ class FrozenFuyu(BaseModel):
 
         self.text_layer_weights = nn.Parameter(
             torch.ones(self.fuyu.config.num_hidden_layers))
-        key_phrase_head.update(in_channels=self.fuyu.config.hidden_size)
-        self.key_phrase_head = BUILDER.build(key_phrase_head)
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
@@ -188,94 +186,6 @@ class FrozenFuyu(BaseModel):
 
         return image_patches.to(self.fuyu.dtype), image_patches_indices, image_token_ids
 
-    @torch.no_grad()
-    def gcg_forward(self, data_sample, **kwargs):
-        input_ids = data_sample['input_ids'].to(self.fuyu.device)
-        image_tensor = data_sample['pixel_values'].to(device=self.fuyu.device, dtype=self.fuyu.dtype)
-        image_patches, image_patches_indices, image_token_ids = self._patchify(image_tensor[None])
-        image_patches_indices = torch.cat([image_patches_indices,
-                                           -torch.ones_like(input_ids)[None]], dim=-1)
-        input_ids = torch.cat([image_token_ids, input_ids[None]], dim=1)  # bs=1, len
-        attention_mask = torch.ones_like(input_ids)
-
-        output = self.fuyu(input_ids=input_ids,
-                           image_patches=image_patches,
-                           image_patches_indices=image_patches_indices,
-                           attention_mask=attention_mask,
-                           use_cache=True)
-
-        past_key_values = output.past_key_values
-        past_length = past_key_values[0][0].shape[2]
-
-        assert input_ids.shape[1] == past_length
-
-        logits = output.logits[0, -1]
-        del output
-        input_ids = logits.argmax().view(1, 1)
-        attention_mask = torch.ones((1, past_length + 1), device=self.llava.device, dtype=torch.bool)
-
-        output = self.fuyu.language_model.generate(
-            input_ids=input_ids,
-            past_key_values=past_key_values,
-            attention_mask=attention_mask,
-            output_attentions=True,
-            output_hidden_states=True,
-            return_dict_in_generate=True,
-            use_cache=True,
-            **kwargs)
-
-        output_ids = output.sequences[0, :-1]
-        assert input_ids[0] == logits.argmax()
-        attentions = output.attentions   # output_len, num_layers, (1/bs, num_heads, 1/seq_len, cur_len)
-        assert len(attentions) == len(output_ids)
-        assert len(attentions[0]) == self.llava.config.text_config.num_hidden_layers
-        num_layers = len(attentions[0])
-        attentions = [torch.cat([attn[layer_id][0, ..., :past_length][..., image_patches_indices >= 0]
-                                 for attn in attentions], dim=-2) for layer_id in range(num_layers)]
-        hidden_states = output.hidden_states   # output_len, num_layers + 1, bs/1, seq_len/1, hidden_dim
-        hidden_states = [torch.cat([feat[layer_id] for feat in hidden_states], dim=-2)
-                         for layer_id in range(1, 1+num_layers)]
-
-        # do keyword detection
-        text_layer_weights = self.get_text_layer_weights()
-        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
-        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
-
-        key_phrases = self.key_phrase_head(hidden_states)  # num_key_phrases, answer_len
-        if len(key_phrases) == 0:
-            key_phrases = torch.ones((1, len(output_ids)),
-                                     device=self.fuyu.device, dtype=torch.bool)
-        mask_attentions = []
-        key_phrase_ids = []
-        for key_phrase in key_phrases:
-            if key_phrase.sum() == 0:
-                key_phrase = torch.ones_like(key_phrase)
-            mask_attentions.append(torch.cat(
-                [self.apply_merge(attn[:, key_phrase], dim=1) for attn in attentions]))
-            key_phrase_ids.append(output_ids[key_phrase])
-        del attentions
-
-        mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-        meta_data = data_sample['meta_data']
-        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        fuyu_h, fuyu_w = padded_h // self.patch_size,  padded_w // self.patch_size
-        mask_attentions = mask_attentions.view(*mask_attentions.shape[:-1], fuyu_h, fuyu_w)
-        pred_masks = self.mask_head(mask_attentions)[:, 0]
-        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
-        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
-        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
-        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
-        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
-        pred_masks = pred_masks[:, before_height:before_height + mask_h,
-                                   before_width:before_width + mask_w].contiguous()
-
-        height, width = data_sample['height'], data_sample['width']
-        pred_masks = F.interpolate(pred_masks[None], size=(height, width), mode='bilinear')[0].cpu()
-        pred_masks = pred_masks > 0
-
-        return output_ids, key_phrase_ids, pred_masks
-
 
 class FrozenFuyuSAM(FrozenFuyu):
     def __init__(self, sam, *args, **kwargs):
@@ -375,11 +285,6 @@ class FrozenFuyuSAM(FrozenFuyu):
         sam_accuracy = 0
         sam_aiou = 0
 
-        # losses_dice_phrase = []
-        # losses_mask_phrase = []
-        # losses_cls_phrase = []
-        # aious_phrase = []
-
         for data_sample in data:
             forward_output = self._forward(data_sample)
             pred_masks, sam_pred_masks = forward_output['pred_masks'], forward_output['sam_pred_masks']
@@ -404,15 +309,6 @@ class FrozenFuyuSAM(FrozenFuyu):
             sam_loss_mask += sam_loss_mask_ * mask_cnt
             sam_accuracy += sam_accuracy_ * mask_cnt
             sam_aiou += sam_aiou_ * mask_cnt
-            #
-            # labels, mask_ids, hidden_states = (forward_output['labels'],
-            #                                    forward_output['mask_ids'], forward_output['hidden_states'])
-            # loss_dice_phrase, loss_mask_phrase, loss_cls_phrase, aiou_phrase = self.key_phrase_head(
-            #     hidden_states[labels >= 0], mask_ids[labels >= 0])
-            # losses_dice_phrase.append(loss_dice_phrase)
-            # losses_mask_phrase.append(loss_mask_phrase)
-            # losses_cls_phrase.append(loss_cls_phrase)
-            # aious_phrase.append(aiou_phrase)
 
         assert mask_cnts > 0
 

@@ -126,6 +126,38 @@ class UNetHead(UNet):
         return self.conv_seg(x)
 
 
+class SingleConvHead(nn.Module):
+    def __init__(self,
+                 in_channels=2048,
+                 upsample_input=64,
+                 kernel_size=5,   # determine receptive field
+                 normalize_input=True):
+        super().__init__()
+        self.conv = nn.Conv2d(in_channels=in_channels, out_channels=1,
+                              kernel_size=kernel_size,
+                              stride=1, padding=(kernel_size - 1) // 2)
+        self.upsample_input = upsample_input
+        self.normalize_input = normalize_input
+
+    def forward(self, x):
+        if self.normalize_input:
+            assert x.min() >= 0.0 and x.max() <= 1.0
+            x_sum = x.sum((-2, -1), keepdims=True).clamp(min=1e-12)
+            x = x / x_sum
+        h, w = x.shape[-2:]
+        if self.upsample_input is not None:
+            scale_factor = max(1.0, self.upsample_input / max(h, w))
+            x = F.interpolate(x.float(), scale_factor=scale_factor, mode='bilinear').to(x)
+            h, w = x.shape[-2:]
+        x = self.conv(x)
+        assert x.shape[-2:] == (h, w)
+        return x
+
+    @property
+    def dtype(self):
+        return self.conv.weight.dtype
+
+
 if __name__ == '__main__':
     from mmseg.models.backbones.unet import InterpConv
     unet = UNetHead(in_channels=2048,
