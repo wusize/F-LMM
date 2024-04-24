@@ -119,13 +119,14 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
     gt_masks = [maskUtils.decode(ann['segmentation']) for ann in gt_anns]
     ious = compute_iou_matrix(gt_masks, pred_masks)
 
-    text_sims = np.zeros((len(gt_labels), len(dt_labels)))
-
     # todo: re-write
-    gt_labels_embeds = np.stack([get_bert_embedding(gt_label) for gt_label in gt_labels], axis=0)
-    dt_labels_embeds = np.stack([get_bert_embedding(dt_label) for dt_label in dt_labels], axis=0)
+    if len(gt_labels) > 0:
+        gt_labels_embeds = np.stack([get_bert_embedding(gt_label) for gt_label in gt_labels], axis=0)
+        dt_labels_embeds = np.stack([get_bert_embedding(dt_label) for dt_label in dt_labels], axis=0)
 
-    text_sims = cosine_similarity(gt_labels_embeds, dt_labels_embeds)
+        text_sims = cosine_similarity(gt_labels_embeds, dt_labels_embeds)
+    else:
+        text_sims = np.zeros((len(gt_labels), len(dt_labels)))
 
     # import pdb; pdb.set_trace()
     # for i, gt_label in enumerate(gt_labels):
