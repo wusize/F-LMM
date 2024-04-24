@@ -40,6 +40,7 @@ model = AutoModel.from_pretrained("checkpoints/bert-base-uncased").cuda()
 
 
 def get_bert_embedding(text):
+    import pdb; pdb.set_trace()
     inputs = tokenizer(text, return_tensors="pt", max_length=512, truncation=True).cuda()
     outputs = model(**inputs)
     # Use the mean of the last hidden states as sentence embedding
