@@ -4,25 +4,18 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
-from torch.nn import GroupNorm, ReLU
 from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
 from mmengine.dataset import DefaultSampler
-from src.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
-                              concat_datasets, gcg_collate_fn)
-# from src.datasets.png import PNGDataset
+from src.datasets.gcg import concat_datasets, gcg_collate_fn
+from src.datasets.png import PNGDataset
 from src.models.llava.modeling_llava import CustomLlavaForConditionalGeneration
 from src.datasets.llava_processors import CustomLlavaImageProcessor
-from src.models.frozen_llava import FrozenLlavaSAM
-from src.models.mask_heads import UNetHead
+from src.models.frozen_llava import FrozenLlava
+from src.models.mask_heads import SingleConvHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
-from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
-from mmseg.models.backbones.unet import InterpConv
-from src.models.key_phrase_heads import KeyPhraseHead
-from src.runner import CustomRunner
-
 from mmdet.datasets import RefCocoDataset
 from src.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
 from mmdet.datasets.transforms import LoadAnnotations
@@ -30,8 +23,6 @@ from mmdet.datasets.transforms import LoadAnnotations
 #######################################################################
 #                          PART 1  Settings                           #
 #######################################################################
-# runner_type = CustomRunner
-# find_unused_parameters = True
 
 # Scheduler & Optimizer
 batch_size = 1  # per_device
@@ -58,21 +49,7 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 prompt_template = PROMPT_TEMPLATE.vicuna
 prompt = "<image>\nPlease give me a description of the image."
 llava_name = 'llava-hf/llava-1.5-7b-hf'
-unet = dict(type=UNetHead,
-            normalize_input=True,
-            upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
-            in_channels=2048,
-            base_channels=64,
-            num_stages=4,
-            strides=(1, 1, 1, 1),
-            enc_num_convs=(2, 2, 2, 2),   # the first enc is for projection
-            dec_num_convs=(2, 2, 2),
-            downsamples=(True, True, True),
-            enc_dilations=(1, 1, 1, 1),
-            dec_dilations=(1, 1, 1),
-            norm_cfg=dict(type=GroupNorm, num_groups=1),
-            upsample_cfg=dict(type=InterpConv)
-            )
+
 loss_mask = dict(
     type=CrossEntropyLoss,
     use_sigmoid=True,
@@ -95,33 +72,13 @@ image_processor = dict(
     pretrained_model_name_or_path='openai/clip-vit-large-patch14-336')
 
 model = dict(
-    type=FrozenLlavaSAM,
-    sam=dict(type=SAMWrapper,
-             use_text=True, use_mask=True, multimask_output=False,
-             model_name='vit_l', checkpoint='checkpoints/sam_vit_l_0b3195.pth',),
+    type=FrozenLlava,
     model=dict(type=CustomLlavaForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.bfloat16, low_cpu_mem_usage=True),
-    mask_head=unet,
+    mask_head=dict(type=SingleConvHead),
     loss_mask=loss_mask,
     loss_dice=loss_dice,
-    key_phrase_head=dict(type=KeyPhraseHead,
-                         encoder=dict(  # DetrTransformerEncoder
-                             num_layers=3,
-                             layer_cfg=dict(  # DetrTransformerEncoderLayer
-                                 self_attn_cfg=dict(  # MultiheadAttention
-                                     embed_dims=256,
-                                     num_heads=8,
-                                     dropout=0.1,
-                                     batch_first=True),
-                                 ffn_cfg=dict(
-                                     embed_dims=256,
-                                     feedforward_channels=2048,
-                                     num_fcs=2,
-                                     ffn_drop=0.1,
-                                     act_cfg=dict(type=ReLU, inplace=True)))),
-                         loss_mask=loss_mask,
-                         loss_dice=loss_dice)
 )
 
 #######################################################################
@@ -149,30 +106,16 @@ refcoco_pipeline = [
             prompt_template=prompt_template)
     ]
 datasets_list = [
-    dict(type=GCGDataset,
-         ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
-         json_file='data/GranDf_HA_GCG_train.json',
-         local_path='data/GranDf_HA_images/train',
-         prompt=prompt,
-         prompt_template=prompt_template,
+    dict(type=PNGDataset,
+         json_file='data/png_coco_train2017.json',
+         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+         panoptic_png_path='data/coco/panoptic_train2017',
          tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=GCGDataset,
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
-         json_file='data/OpenPsgGCG_train.json',
-         local_path='data/coco',
-         prompt=prompt,
+         image_processor=image_processor,
          prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=FlickrForGCGDataset,
-         ceph_path='BJ17:S3://wusize/flickr/train',
-         json_file='data/flickr_mergedGT_GCG_train.json',
-         local_path='data/flickr/train',
-         prompt=prompt,
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
+         local_path='data/coco/train2017',
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
+         prompt=prompt),
     dict(type=RefCocoDataset,
          data_root='data/coco/',
          data_prefix=dict(img_path='train2014/'),

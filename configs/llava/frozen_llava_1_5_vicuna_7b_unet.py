@@ -4,22 +4,23 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
-from torch.nn import GroupNorm
 from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
 from mmengine.dataset import DefaultSampler
-from src.datasets.gcg import (GCGDataset, FlickrForGCGDataset, RefCOCOGForGCGDataset,
-                              concat_datasets, gcg_collate_fn)
-# from src.datasets.png import PNGDataset
+from src.datasets.gcg import concat_datasets, gcg_collate_fn
+from src.datasets.png import PNGDataset
 from src.models.llava.modeling_llava import CustomLlavaForConditionalGeneration
 from src.datasets.llava_processors import CustomLlavaImageProcessor
 from src.models.frozen_llava import FrozenLlava
 from src.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
-from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
+from mmdet.datasets import RefCocoDataset
+from src.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
+from mmdet.datasets.transforms import LoadAnnotations
 from mmseg.models.backbones.unet import InterpConv
+from torch.nn import GroupNorm
 
 #######################################################################
 #                          PART 1  Settings                           #
@@ -29,7 +30,7 @@ from mmseg.models.backbones.unet import InterpConv
 batch_size = 1  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
-max_epochs = 1
+max_epochs = 8
 optim_type = AdamW
 lr = 1e-4
 betas = (0.9, 0.999)
@@ -48,8 +49,10 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 #######################################################################
 # Model
 prompt_template = PROMPT_TEMPLATE.vicuna
+prompt = "<image>\nPlease give me a description of the image."
 llava_name = 'llava-hf/llava-1.5-7b-hf'
 unet = dict(type=UNetHead,
+            normalize_input=True,
             upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
             in_channels=2048,
             base_channels=64,
@@ -63,14 +66,19 @@ unet = dict(type=UNetHead,
             norm_cfg=dict(type=GroupNorm, num_groups=1),
             upsample_cfg=dict(type=InterpConv)
             )
-# fcn = dict(type=FCNHead,
-#            num_convs=4,
-#            kernel_size=3,
-#            in_channels=2048,
-#            channels=256,
-#            concat_input=True,
-#            norm_cfg=dict(type=GroupNorm, num_groups=1),
-#            )
+loss_mask = dict(
+    type=CrossEntropyLoss,
+    use_sigmoid=True,
+    reduction='mean',
+    loss_weight=1.0)
+loss_dice = dict(
+    type=DiceLoss,
+    use_sigmoid=True,
+    activate=True,
+    reduction='mean',
+    naive_dice=True,
+    eps=1.0,
+    loss_weight=1.0)
 
 tokenizer = dict(
     type=AutoTokenizer.from_pretrained,
@@ -83,65 +91,68 @@ model = dict(
     type=FrozenLlava,
     model=dict(type=CustomLlavaForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
-               torch_dtype=torch.float16, low_cpu_mem_usage=True),
+               torch_dtype=torch.bfloat16, low_cpu_mem_usage=True),
     mask_head=unet,
-    loss_mask=dict(
-        type=CrossEntropyLoss,
-        use_sigmoid=True,
-        reduction='mean',
-        loss_weight=1.0),
-    loss_dice=dict(
-        type=DiceLoss,
-        use_sigmoid=True,
-        activate=True,
-        reduction='mean',
-        naive_dice=True,
-        eps=1.0,
-        loss_weight=1.0)
+    loss_mask=loss_mask,
+    loss_dice=loss_dice,
 )
 
 #######################################################################
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 
+backend_args = dict(
+    backend='petrel',
+    path_mapping=dict({
+        'data/coco/train2014/': 'openmmlab:s3://openmmlab/datasets/detection/coco/train2014/'})
+)
+refcoco_pipeline = [
+        dict(type=PILLoadImageFromFile, backend_args=backend_args),
+        dict(
+            type=LoadAnnotations,
+            with_mask=True,
+            with_bbox=False,
+            with_seg=False,
+            with_label=False),
+        dict(
+            type=RefCOCO2PNG,
+            image_processor=image_processor,
+            tokenizer=tokenizer,
+            prompt=prompt,
+            prompt_template=prompt_template)
+    ]
 datasets_list = [
-    dict(type=GCGDataset,
-         ceph_path='BJ17:S3://wusize/GranDf_HA_images/train',
-         json_file='data/GranDf_HA_GCG_train.json',
-         local_path='data/GranDf_HA_images/train',
-         prompt_template=prompt_template,
+    dict(type=PNGDataset,
+         json_file='data/png_coco_train2017.json',
+         panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
+         panoptic_png_path='data/coco/panoptic_train2017',
          tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=GCGDataset,
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco',
-         json_file='data/OpenPsgGCG_train.json',
-         local_path='data/coco',
+         image_processor=image_processor,
          prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=RefCOCOGForGCGDataset,
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2014',
-         json_file='data/RefCOCOg_GCG_train.json',
-         local_path='data/coco/train2014',
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    dict(type=FlickrForGCGDataset,
-         ceph_path='BJ17:S3://wusize/flickr/train',
-         json_file='data/flickr_mergedGT_GCG_train.json',
-         local_path='data/flickr/train',
-         prompt_template=prompt_template,
-         tokenizer=tokenizer,
-         image_processor=image_processor),
-    # dict(type=PNGDataset,
-    #      json_file='data/png_coco_train2017.json',
-    #      panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-    #      panoptic_png_path='data/coco/panoptic_train2017',
-    #      tokenizer=tokenizer,
-    #      image_processor=image_processor,
-    #      prompt_template=prompt_template,
-    #      local_path='data/coco/train2017',
-    #      ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017')
+         local_path='data/coco/train2017',
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
+         prompt=prompt),
+    dict(type=RefCocoDataset,
+         data_root='data/coco/',
+         data_prefix=dict(img_path='train2014/'),
+         pipeline=refcoco_pipeline,
+         ann_file='refcoco/instances.json',
+         split_file='refcoco/refs(unc).p',
+         ),
+    dict(type=RefCocoDataset,
+         data_root='data/coco/',
+         data_prefix=dict(img_path='train2014/'),
+         pipeline=refcoco_pipeline,
+         ann_file='refcoco+/instances.json',
+         split_file='refcoco+/refs(unc).p',
+         ),
+    dict(type=RefCocoDataset,
+         data_root='data/coco/',
+         data_prefix=dict(img_path='train2014/'),
+         pipeline=refcoco_pipeline,
+         ann_file='refcocog/instances.json',
+         split_file='refcocog/refs(umd).p',
+         )
 ]
 
 train_dataloader = dict(
@@ -163,7 +174,7 @@ optim_wrapper = dict(
     clip_grad=dict(max_norm=max_norm, error_if_nonfinite=False),
     accumulative_counts=accumulative_counts,
     loss_scale='dynamic',
-    dtype='float16')
+    dtype='bfloat16')
 
 # learning policy
 # More information: https://github.com/open-mmlab/mmengine/blob/main/docs/en/tutorials/param_scheduler.md  # noqa: E501
