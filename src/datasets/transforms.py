@@ -1,5 +1,5 @@
 # Copyright (c) OpenMMLab. All rights reserved.
-from typing import Optional
+from typing import Optional, Dict, Union, Tuple, List
 from PIL import Image
 import mmengine.fileio as fileio
 import io
@@ -8,6 +8,7 @@ from xtuner.registry import BUILDER
 from xtuner.utils.constants import IGNORE_INDEX
 import torch
 import torch.nn.functional as F
+import copy
 
 try:
     from petrel_client.client import Client
@@ -62,15 +63,33 @@ class RefCOCO2PNG(BaseTransform):
                  image_processor=None,
                  tokenizer=None,
                  prompt_template=None,
-                 prompt='<image>\nWhat is shown in this image?'):
+                 prompt='<image>\nWhat is shown in this image?',
+                 concat=True):
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_processor = BUILDER.build(image_processor)
         self.prompt = self.tokenizer.encode(
             prompt_template['INSTRUCTION'].format(input=prompt),
             add_special_tokens=True)
         self.prompt_template = prompt_template
+        self.concat = concat
 
-    def transform(self, results: dict):
+    def transform(self, results):
+        if self.concat:
+            return self.transform_concat(results)
+        else:
+            return self.transform_split(results)
+
+    def transform_split(self, results):
+        all_results = []
+        for inst_id, instant_text in enumerate(results['text']):
+            new_results = copy.deepcopy(results)
+            new_results['text'] = [instant_text]
+            new_results['gt_masks'] = results['gt_masks'][inst_id:inst_id+1]
+            all_results.append(self.transform_concat(new_results))
+
+        return all_results
+
+    def transform_concat(self, results: dict):
 
         caption_input_ids = []
         mask_ids = [-1] * len(self.prompt)

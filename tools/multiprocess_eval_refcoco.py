@@ -24,6 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--ceph', action='store_true')
+    parser.add_argument('--concat', action='store_true')
     args = parser.parse_args()
 
     ### Initialize accelerator
@@ -67,8 +68,9 @@ if __name__ == '__main__':
         image_processor=image_processor,
         tokenizer=tokenizer,
         prompt_template=prompt_template,
-
+        concat=args.concat
     )
+    accelerator.print(f"Do concatenation? {args.concat}")
     if prompt is not None:
         refcoco2png_params.update(prompt=prompt)
 
@@ -124,23 +126,44 @@ if __name__ == '__main__':
         with accelerator.split_between_processes(data_ids) as sub_ids:
             for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
                 data_sample = dataset[idx]
-                with torch.no_grad():
-                    pred_mask_logits = model.predict(data_sample)
+                if args.concat:
+                    with torch.no_grad():
+                        pred_mask_logits = model.predict(data_sample)
 
-                gt_masks = data_sample['gt_masks'].numpy() > 0
-                pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
-                                           size=gt_masks.shape[-2:], mode='bilinear')[0].cpu()
-                pred_masks = pred_masks > 0.5
+                    gt_masks = data_sample['gt_masks'].numpy() > 0
+                    pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
+                                               size=gt_masks.shape[-2:], mode='bilinear')[0].cpu()
+                    pred_masks = pred_masks > 0.5
 
-                assert len(pred_masks) == len(gt_masks)
-                mask_cnt = pred_masks.shape[0]
+                    assert len(pred_masks) == len(gt_masks)
+                    mask_cnt = pred_masks.shape[0]
 
-                # Formulate the output into the format that the evaluator accepts
-                results.append(dict(pred_instances=dict(masks=pred_masks),
-                                    gt_masks=BitmapMasks(masks=gt_masks,
-                                                         height=gt_masks.shape[1],
-                                                         width=gt_masks.shape[2]))
-                               )
+                    # Formulate the output into the format that the evaluator accepts
+                    results.append(dict(pred_instances=dict(masks=pred_masks),
+                                        gt_masks=BitmapMasks(masks=gt_masks,
+                                                             height=gt_masks.shape[1],
+                                                             width=gt_masks.shape[2]))
+                                   )
+                else:
+                    for sub_data_sample in data_sample:
+                        with torch.no_grad():
+                            pred_mask_logits = model.predict(sub_data_sample)
+
+                        gt_masks = sub_data_sample['gt_masks'].numpy() > 0
+                        pred_masks = F.interpolate(pred_mask_logits[None].float().sigmoid(),
+                                                   size=gt_masks.shape[-2:], mode='bilinear')[0].cpu()
+                        pred_masks = pred_masks > 0.5
+
+                        assert len(pred_masks) == len(gt_masks)
+                        mask_cnt = pred_masks.shape[0]
+                        assert mask_cnt == 1
+
+                        # Formulate the output into the format that the evaluator accepts
+                        results.append(dict(pred_instances=dict(masks=pred_masks),
+                                            gt_masks=BitmapMasks(masks=gt_masks,
+                                                                 height=gt_masks.shape[1],
+                                                                 width=gt_masks.shape[2]))
+                                       )
             results = gather_object(results)
         if accelerator.is_main_process:
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
