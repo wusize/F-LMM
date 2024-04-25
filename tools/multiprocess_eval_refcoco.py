@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', default=None, type=str)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--ceph', action='store_true')
-    parser.add_argument('--concat', action='store_true')
+    parser.add_argument('--concat', action='store_true', default=True)
     args = parser.parse_args()
 
     ### Initialize accelerator
