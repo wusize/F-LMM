@@ -187,9 +187,11 @@ def evaluate_recall_with_mapping(coco_gt, coco_cap_gt, image_ids, pred_save_path
         dt_labels = dt_cap_ann['labels']
 
         actual_positives += len(gt_labels)
+        num_dets = min(len(dt_anns), len(dt_labels))
 
         # Find best matching pairs
-        best_matches = find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, text_sim_threshold)
+        best_matches = find_best_matches(gt_anns, gt_labels, dt_anns[:num_dets],
+                                         dt_labels[:num_dets], iou_threshold, text_sim_threshold)
 
         true_positives += len(best_matches)
 
