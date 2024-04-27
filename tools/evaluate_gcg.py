@@ -140,6 +140,7 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
             if ious[max_iou_idx] < iou_threshold or text_sims[max_iou_idx] < text_sim_threshold:
                 break  # No admissible pair found
         except:
+            import pdb; pdb.set_trace()
             break
 
         best_matches.append(max_iou_idx)
