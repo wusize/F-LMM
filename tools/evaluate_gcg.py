@@ -120,7 +120,7 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
     ious = compute_iou_matrix(gt_masks, pred_masks)
 
     # todo: re-write
-    if len(gt_labels) > 0:
+    if len(gt_labels) > 0 and len(dt_labels) > 0:
         gt_labels_embeds = np.stack([get_bert_embedding(gt_label) for gt_label in gt_labels], axis=0)
         dt_labels_embeds = np.stack([get_bert_embedding(dt_label) for dt_label in dt_labels], axis=0)
 
