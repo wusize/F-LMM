@@ -135,10 +135,12 @@ def find_best_matches(gt_anns, gt_labels, dt_anns, dt_labels, iou_threshold, tex
 
     # Find one-to-one matches satisfying both IoU and text similarity thresholds
     while ious.size > 0:
-        import pdb; pdb.set_trace()
         max_iou_idx = np.unravel_index(np.argmax(ious), ious.shape)
-        if ious[max_iou_idx] < iou_threshold or text_sims[max_iou_idx] < text_sim_threshold:
-            break  # No admissible pair found
+        try:
+            if ious[max_iou_idx] < iou_threshold or text_sims[max_iou_idx] < text_sim_threshold:
+                break  # No admissible pair found
+        except:
+            break
 
         best_matches.append(max_iou_idx)
 
