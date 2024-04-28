@@ -11,13 +11,12 @@ class Pad2Square:
         print_log(f"image_mean: {image_mean}")
         self.image_mean = image_mean
 
-        
     def preprocess(self, image, return_tensors=None):
         image = image.convert('RGB')
 
         width, height = image.size
         if width == height:
-            result =  image
+            result = image
             before_height = after_height = before_width = after_width = 0
         elif width > height:
             result = Image.new(image.mode, (width, width), self.image_mean)
@@ -32,7 +31,6 @@ class Pad2Square:
             before_width = (height - width) // 2
             after_width = height - before_width
             before_height = after_height = 0
-
 
         meta = dict(padding=dict(before_height=before_height, after_height=after_height,
                                  before_width=before_width, after_width=after_width),

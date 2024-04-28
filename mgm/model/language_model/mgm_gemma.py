@@ -74,8 +74,9 @@ class MGMGemmaForCausalLM(GemmaForCausalLM, MGMMetaForCausalLM):
         images: Optional[torch.FloatTensor] = None,
         images_aux: Optional[torch.FloatTensor] = None,
         return_dict: Optional[bool] = None,
+        mask_ids: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        mask_ids, image_places = None, None
+        image_places = None
         if inputs_embeds is None:
             (
                 input_ids,
@@ -91,7 +92,7 @@ class MGMGemmaForCausalLM(GemmaForCausalLM, MGMMetaForCausalLM):
                 past_key_values,
                 labels,
                 images,
-                images_aux
+                images_aux, mask_ids=mask_ids
             )
         assert return_dict
 

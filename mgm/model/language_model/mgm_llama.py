@@ -115,6 +115,7 @@ class MGMLlamaForCausalLM(LlamaForCausalLM, MGMMetaForCausalLM):
         images: Optional[torch.FloatTensor] = None,
         images_aux: Optional[torch.FloatTensor] = None,
         return_dict: Optional[bool] = None,
+        mask_ids: Optional[torch.LongTensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
 
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
@@ -122,7 +123,7 @@ class MGMLlamaForCausalLM(LlamaForCausalLM, MGMMetaForCausalLM):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        mask_ids = image_places = None
+        image_places = None
         if inputs_embeds is None:
             (
                 input_ids,
@@ -138,7 +139,7 @@ class MGMLlamaForCausalLM(LlamaForCausalLM, MGMMetaForCausalLM):
                 past_key_values,
                 labels,
                 images,
-                images_aux
+                images_aux, mask_ids=mask_ids
             )
 
         # decoder outputs consists of (dec_features, layer_state, dec_hidden, dec_attn)
