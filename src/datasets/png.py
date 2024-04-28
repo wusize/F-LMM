@@ -51,10 +51,7 @@ class PNGDataset(Dataset):
            self.image_processor = BUILDER.build(image_processor)
         else:
             self.image_processor = image_processor
-        self.prompt = self.tokenizer.encode(
-            prompt_template['INSTRUCTION'].format(input=prompt),
-            add_special_tokens=True)
-        self.prompt_template = prompt_template
+
         self.image2tensor = image2tensor
 
         self.add_image_token = add_image_token
@@ -65,6 +62,11 @@ class PNGDataset(Dataset):
 
         self.image_token_idx = self.tokenizer.encode('<image>', add_special_tokens=False)[-1]
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
+
+        self.prompt = self.tokenizer.encode(
+            prompt_template['INSTRUCTION'].format(input=prompt),
+            add_special_tokens=True)
+        self.prompt_template = prompt_template
 
     @staticmethod
     def _load_segm(segm_path):
@@ -168,7 +170,6 @@ class PNGDataset(Dataset):
         labels[prompt_len:] = input_ids[prompt_len:]
 
         if self.add_image_token:
-            import pdb; pdb.set_trace()
             input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
 
         return dict(input_ids=input_ids,
