@@ -19,7 +19,8 @@ import mmcv
 import io
 from mmengine.fileio import get
 from panopticapi import utils
-from xtuner.utils.constants import IGNORE_INDEX
+from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX
+from mmengine.logging import print_log
 
 
 class PNGDataset(Dataset):
@@ -30,7 +31,8 @@ class PNGDataset(Dataset):
                  image_processor=None, tokenizer=None,
                  ceph_path=None, local_path=None, prompt_template=None,
                  prompt='<image>\nWhat is shown in this image?',
-                 image2tensor=True):
+                 image2tensor=True,
+                 add_image_token=False):
         super().__init__()
         with open(json_file, 'r') as f:
             self.data = json.load(f)
@@ -54,6 +56,15 @@ class PNGDataset(Dataset):
             add_special_tokens=True)
         self.prompt_template = prompt_template
         self.image2tensor = image2tensor
+
+        self.add_image_token = add_image_token
+        if add_image_token:
+            special_tokens_dict = {'additional_special_tokens': ['<image>',]}
+            num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+            assert num_added_toks == 1
+
+        self.image_token_idx = self.tokenizer.encode('<image>', add_special_tokens=False)[-1]
+        print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
 
     @staticmethod
     def _load_segm(segm_path):
@@ -157,6 +168,9 @@ class PNGDataset(Dataset):
         prompt_len = len(self.prompt)
         labels = torch.ones_like(input_ids) * IGNORE_INDEX
         labels[prompt_len:] = input_ids[prompt_len:]
+
+        if self.add_image_token:
+            input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
 
         return dict(input_ids=input_ids,
                     mask_ids=mask_ids,

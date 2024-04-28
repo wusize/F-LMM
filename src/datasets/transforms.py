@@ -2,10 +2,11 @@
 from typing import Optional, Dict, Union, Tuple, List
 from PIL import Image
 import mmengine.fileio as fileio
+from mmengine.logging import print_log
 import io
 from mmcv.transforms import LoadImageFromFile, BaseTransform
 from xtuner.registry import BUILDER
-from xtuner.utils.constants import IGNORE_INDEX
+from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX
 import torch
 import torch.nn.functional as F
 import copy
@@ -65,7 +66,8 @@ class RefCOCO2PNG(BaseTransform):
                  prompt_template=None,
                  prompt='<image>\nWhat is shown in this image?',
                  concat=True,
-                 image2tensor=True):
+                 image2tensor=True,
+                 add_image_token=False):
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_processor = BUILDER.build(image_processor)
         self.prompt = self.tokenizer.encode(
@@ -74,6 +76,15 @@ class RefCOCO2PNG(BaseTransform):
         self.prompt_template = prompt_template
         self.concat = concat
         self.image2tensor = image2tensor
+
+        self.add_image_token = add_image_token
+        if add_image_token:
+            special_tokens_dict = {'additional_special_tokens': ['<image>', ]}
+            num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+            assert num_added_toks == 1
+
+        self.image_token_idx = self.tokenizer.encode('<image>', add_special_tokens=False)[-1]
+        print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
 
     def transform(self, results):
         if self.concat:
@@ -138,6 +149,9 @@ class RefCOCO2PNG(BaseTransform):
         prompt_len = len(self.prompt)
         labels = torch.ones_like(input_ids) * IGNORE_INDEX
         labels[prompt_len:] = input_ids[prompt_len:]
+
+        if self.add_image_token:
+            input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
 
         return dict(input_ids=input_ids,
                     mask_ids=mask_ids,
