@@ -22,14 +22,14 @@ class Pad2Square:
             result = Image.new(image.mode, (width, width), self.image_mean)
             result.paste(image, (0, (width - height) // 2))
             before_height = (width - height) // 2
-            after_height = width - before_height
+            after_height = (width - height) - before_height
             before_width = after_width = 0
         else:
             result = Image.new(image.mode, (height, height), self.image_mean)
             result.paste(image, ((height - width) // 2, 0))
             # return result
             before_width = (height - width) // 2
-            after_width = height - before_width
+            after_width = (height - width) - before_width
             before_height = after_height = 0
 
         meta = dict(padding=dict(before_height=before_height, after_height=after_height,
