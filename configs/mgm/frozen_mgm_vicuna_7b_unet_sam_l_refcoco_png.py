@@ -123,7 +123,8 @@ refcoco_pipeline = [
             tokenizer=tokenizer,
             prompt=prompt,
             prompt_template=prompt_template,
-            image2tensor=False
+            image2tensor=False,
+            add_image_token=True
         )
     ]
 datasets_list = [
@@ -137,7 +138,8 @@ datasets_list = [
          local_path='data/coco/train2017',
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
          prompt=prompt,
-         image2tensor=False),
+         image2tensor=False,
+         add_image_token=True),
     dict(type=RefCocoDataset,
          data_root='data/coco/',
          data_prefix=dict(img_path='train2014/'),
