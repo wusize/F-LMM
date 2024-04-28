@@ -225,7 +225,7 @@ class FrozenMGMSAM(FrozenMGM):
         image_tensor, image_tensor_aux = self._process_image(data_sample['pixel_values'])
         input_ids = data_sample['input_ids'][None].to(self.mgm.device)
         mask_ids = data_sample['mask_ids'][None].to(self.mgm.device)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         with torch.no_grad():
             outputs = self.mgm(input_ids=input_ids,
                                mask_ids=mask_ids,
@@ -236,7 +236,7 @@ class FrozenMGMSAM(FrozenMGM):
                                return_dict=True,
                                use_cache=False)
 
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
 
         meta_data = data_sample['meta_data']
         mask_ids = outputs['mask_ids'][0]
