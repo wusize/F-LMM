@@ -129,6 +129,7 @@ class PNGDataset(Dataset):
 
         image = self.read_image(image_info['file_name'])
         image_data = self.image_processor.preprocess(image)
+        import pdb; pdb.set_trace()
 
         pixel_values = torch.from_numpy(image_data['pixel_values'][0])
         meta_data = image_data['meta_datas'][0]
