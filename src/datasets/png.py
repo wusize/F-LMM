@@ -125,6 +125,8 @@ class PNGDataset(Dataset):
             masks.append(np.clip(mask, a_max=1, a_min=0))
         assert len(masks) == mask_cnt
 
+        import pdb; pdb.set_trace()
+
         input_ids = self.prompt + caption_input_ids
         input_ids = torch.tensor(input_ids, dtype=torch.long)
         mask_ids = torch.tensor(mask_ids)
