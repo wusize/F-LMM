@@ -115,7 +115,7 @@ class FrozenMGM(BaseModel):
 
     def _process_image(self, image):
 
-        image_tensor = self.image_processor.preprocess(image.numpy(), return_tensors='pt')['pixel_values']
+        image_tensor = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values']
 
         image_grid = getattr(self.mgm.config, 'image_grid', 1)
         if hasattr(self.mgm.config, 'image_size_aux'):

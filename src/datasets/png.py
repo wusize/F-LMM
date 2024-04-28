@@ -29,7 +29,8 @@ class PNGDataset(Dataset):
                  panoptic_png_path,
                  image_processor=None, tokenizer=None,
                  ceph_path=None, local_path=None, prompt_template=None,
-                 prompt='<image>\nWhat is shown in this image?'):
+                 prompt='<image>\nWhat is shown in this image?',
+                 image2tensor=True):
         super().__init__()
         with open(json_file, 'r') as f:
             self.data = json.load(f)
@@ -52,6 +53,7 @@ class PNGDataset(Dataset):
             prompt_template['INSTRUCTION'].format(input=prompt),
             add_special_tokens=True)
         self.prompt_template = prompt_template
+        self.image2tensor = image2tensor
 
     @staticmethod
     def _load_segm(segm_path):
@@ -130,7 +132,9 @@ class PNGDataset(Dataset):
         image = self.read_image(image_info['file_name'])
         image_data = self.image_processor.preprocess(image)
 
-        pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        pixel_values = image_data['pixel_values'][0]
+        if self.image2tensor:
+            pixel_values = torch.from_numpy(pixel_values)
         meta_data = image_data['meta_datas'][0]
 
         masks = torch.from_numpy(np.stack(masks))

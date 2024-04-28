@@ -64,7 +64,8 @@ class RefCOCO2PNG(BaseTransform):
                  tokenizer=None,
                  prompt_template=None,
                  prompt='<image>\nWhat is shown in this image?',
-                 concat=True):
+                 concat=True,
+                 image2tensor=True):
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_processor = BUILDER.build(image_processor)
         self.prompt = self.tokenizer.encode(
@@ -72,6 +73,7 @@ class RefCOCO2PNG(BaseTransform):
             add_special_tokens=True)
         self.prompt_template = prompt_template
         self.concat = concat
+        self.image2tensor = image2tensor
 
     def transform(self, results):
         if self.concat:
@@ -110,7 +112,9 @@ class RefCOCO2PNG(BaseTransform):
         image = results['img']
         image_data = self.image_processor.preprocess(image)
 
-        pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        pixel_values = image_data['pixel_values'][0]
+        if self.image2tensor:
+            pixel_values = torch.from_numpy(pixel_values)
         meta_data = image_data['meta_datas'][0]
 
         assert len(results['gt_masks'].masks) == len(results['text'])
