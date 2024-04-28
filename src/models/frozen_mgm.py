@@ -65,12 +65,10 @@ class FrozenMGM(BaseModel):
 
     @property
     def patch_size(self):
-        return self.mgm.get_vision_tower().patch_size
+        return self.mgm.get_vision_tower().config.patch_size
 
     @property
     def clip_shape(self):
-        assert (self.image_processor.image_size_raw['height'] ==
-                self.image_processor.image_size_raw['width'])
         return (self.image_processor.image_size_raw['height'] // self.patch_size,
                 self.image_processor.image_size_raw['width'] // self.patch_size)
 
