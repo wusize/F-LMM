@@ -248,7 +248,6 @@ class FrozenMGMSAM(FrozenMGM):
 
         del outputs
 
-        # attentions = [attn.view(*attn.shape[:-1], llava_h, llava_w) for attn in attentions]
         masks = data_sample['masks']
         mask_attentions = []
         text_embeds = []
@@ -304,7 +303,7 @@ class FrozenMGMSAM(FrozenMGM):
         for data_sample in data:
             forward_output = self._forward(data_sample)
             pred_masks, sam_pred_masks = forward_output['pred_masks'], forward_output['sam_pred_masks']
-            masks = data_sample['masks'].to(self.llava.device)
+            masks = data_sample['masks'].to(self.mgm.device)
             gt_masks = F.interpolate(masks[None].float(),
                                      size=pred_masks.shape[-2:])[0].to(pred_masks)
             sam_gt_masks = F.interpolate(masks[None].float(),
