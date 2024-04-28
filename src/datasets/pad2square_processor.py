@@ -37,7 +37,6 @@ class Pad2Square:
                     image_shape=dict(height=height, width=width),
                     padded_shape=dict(height=max(height, width), width=max(height, width)))
 
-        result = np.array(result)    # to numpy
         data = {"pixel_values": [result], "image_sizes": [(height, width)], "meta_datas": [meta]}
 
         return BatchFeature(data=data, tensor_type=return_tensors)
