@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 from xtuner.model.utils import LoadWoInit
-
+from mmengine.logging import print_log
 
 @torch.no_grad()
 def compute_mask_IoU(masks, target):
@@ -78,15 +78,18 @@ class FrozenMGM(BaseModel):
         model_path = model['pretrained_model_name_or_path']
         with LoadWoInit():
             model = BUILDER.build(model)
+        print_log("Finished loading MGM model")
         vision_tower = model.get_vision_tower()
         if not vision_tower.is_loaded:
             vision_tower.load_model()
+            print_log("Finished loading CLIP vision model")
         vision_tower.to(dtype=model.dtype)
         image_processor = vision_tower.image_processor
 
         vision_tower_aux = model.get_vision_tower_aux()
         if not vision_tower_aux.is_loaded:
             vision_tower_aux.load_model()
+            print_log("Finished loading Convnext model")
         vision_tower_aux.to(dtype=model.dtype)
 
         # initialize attention modules
