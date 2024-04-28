@@ -30,6 +30,7 @@ def concat_datasets(datasets_list):
 def gcg_collate_fn(instances: Sequence[Dict]):
     # return instances
     # all list
+    import pdb; pdb.set_trace()
     return {'data': instances, 'data_samples': None}
     # keys = instances[0].keys()
     # return {k: [inst[k] for inst in instances] for k in keys}
