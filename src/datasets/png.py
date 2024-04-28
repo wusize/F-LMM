@@ -168,6 +168,7 @@ class PNGDataset(Dataset):
         labels[prompt_len:] = input_ids[prompt_len:]
 
         if self.add_image_token:
+            import pdb; pdb.set_trace()
             input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
 
         return dict(input_ids=input_ids,
