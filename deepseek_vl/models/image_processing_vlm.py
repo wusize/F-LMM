@@ -28,6 +28,7 @@ from transformers import AutoImageProcessor, PretrainedConfig
 from transformers.image_processing_utils import BaseImageProcessor, BatchFeature
 from transformers.image_utils import to_numpy_array
 from transformers.utils import logging
+from src.utils import multi_apply
 
 logger = logging.get_logger(__name__)
 
@@ -41,15 +42,27 @@ IMAGENET_INCEPTION_STD = (0.5, 0.5, 0.5)
 def expand2square(pil_img, background_color):
     width, height = pil_img.size
     if width == height:
-        return pil_img
+        result = pil_img
+        before_height = after_height = before_width = after_width = 0
     elif width > height:
         result = Image.new(pil_img.mode, (width, width), background_color)
         result.paste(pil_img, (0, (width - height) // 2))
-        return result
+        before_height = (width - height) // 2
+        after_height = (width - height) - before_height
+        before_width = after_width = 0
     else:
         result = Image.new(pil_img.mode, (height, height), background_color)
         result.paste(pil_img, ((height - width) // 2, 0))
-        return result
+        before_width = (height - width) // 2
+        after_width = (height - width) - before_width
+        before_height = after_height = 0
+
+    meta = dict(padding=dict(before_height=before_height, after_height=after_height,
+                             before_width=before_width, after_width=after_width),
+                image_shape=dict(height=height, width=width),
+                padded_shape=dict(height=max(height, width), width=max(height, width)))
+
+    return result, meta
 
 
 class VLMImageProcessorConfig(PretrainedConfig):
@@ -124,7 +137,7 @@ class VLMImageProcessor(BaseImageProcessor):
         else:
             self.background_color = tuple([int(x * 255) for x in image_mean])
 
-    def resize(self, pil_img: Image) -> np.ndarray:
+    def resize(self, pil_img: Image):
         """
 
         Args:
@@ -153,18 +166,20 @@ class VLMImageProcessor(BaseImageProcessor):
             antialias=True,
         )
 
-        pil_img = expand2square(pil_img, self.background_color)
+        pil_img, meta = expand2square(pil_img, self.background_color)
         x = to_numpy_array(pil_img)
 
         # [H, W, 3] -> [3, H, W]
         x = np.transpose(x, (2, 0, 1))
 
-        return x
+        return x, meta
 
     def preprocess(self, images, return_tensors: str = "pt", **kwargs) -> BatchFeature:
         # resize and pad to [self.image_size, self.image_size]
         # then convert from [H, W, 3] to [3, H, W]
-        images: List[np.ndarray] = [self.resize(image) for image in images]
+        # images: List[np.ndarray] = [self.resize(image) for image in images]
+        image_sizes = [(image.height, image.width) for image in images]
+        images, meta_datas = multi_apply(self.resize, images)
 
         # resacle from [0, 255] -> [0, 1]
         images = [
@@ -189,6 +204,9 @@ class VLMImageProcessor(BaseImageProcessor):
             ]
 
         data = {"pixel_values": images}
+        if not return_tensors:
+            data.update({"image_sizes": image_sizes, "meta_datas": meta_datas})
+
         return BatchFeature(data=data, tensor_type=return_tensors)
 
     @property

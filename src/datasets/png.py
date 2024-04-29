@@ -19,7 +19,7 @@ import mmcv
 import io
 from mmengine.fileio import get
 from panopticapi import utils
-from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX
+from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from mmengine.logging import print_log
 
 
@@ -32,7 +32,8 @@ class PNGDataset(Dataset):
                  ceph_path=None, local_path=None, prompt_template=None,
                  prompt='<image>\nWhat is shown in this image?',
                  image2tensor=True,
-                 add_image_token=False):
+                 add_image_token=False,
+                 image_token=DEFAULT_IMAGE_TOKEN):
         super().__init__()
         with open(json_file, 'r') as f:
             self.data = json.load(f)
@@ -53,14 +54,15 @@ class PNGDataset(Dataset):
             self.image_processor = image_processor
 
         self.image2tensor = image2tensor
+        self.image_token = image_token
 
         self.add_image_token = add_image_token
         if add_image_token:
-            special_tokens_dict = {'additional_special_tokens': ['<image>',]}
+            special_tokens_dict = {'additional_special_tokens': [self.image_token,]}
             num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
             assert num_added_toks == 1
 
-        self.image_token_idx = self.tokenizer.encode('<image>', add_special_tokens=False)[-1]
+        self.image_token_idx = self.tokenizer.encode(self.image_token, add_special_tokens=False)[-1]
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
 
         self.prompt = self.tokenizer.encode(
