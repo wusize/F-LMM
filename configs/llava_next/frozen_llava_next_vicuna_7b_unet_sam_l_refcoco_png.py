@@ -4,6 +4,7 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
                             LoggerHook, ParamSchedulerHook)
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
+from torch.nn import GroupNorm
 from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
@@ -13,11 +14,11 @@ from src.datasets.png import PNGDataset
 from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
 from src.datasets.llava_next_processors import CustomLlavaNextImageProcessor
 from src.models.frozen_llava_next import FrozenLlavaNextSAM
-from src.models.mask_heads import SingleConvHead
+from src.models.mask_heads import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
 from src.models.segment_modules.sam_wrapper import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
-
+from mmseg.models.backbones.unet import InterpConv
 from mmdet.datasets import RefCocoDataset
 from src.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
 from mmdet.datasets.transforms import LoadAnnotations
@@ -50,8 +51,23 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 #######################################################################
 # Model
 prompt = "<image>\nPlease give me a description of the image."
-prompt_template = PROMPT_TEMPLATE.mistral
-llava_name = 'llava-hf/llava-v1.6-mistral-7b-hf'
+prompt_template = PROMPT_TEMPLATE.vicuna
+llava_name = 'llava-hf/llava-v1.6-vicuna-7b-hf'
+unet = dict(type=UNetHead,
+            normalize_input=True,
+            upsample_input=64,
+            in_channels=2048,
+            base_channels=64,
+            num_stages=4,
+            strides=(1, 1, 1, 1),
+            enc_num_convs=(2, 2, 2, 2),   # the first enc is for projection
+            dec_num_convs=(2, 2, 2),
+            downsamples=(True, True, True),
+            enc_dilations=(1, 1, 1, 1),
+            dec_dilations=(1, 1, 1),
+            norm_cfg=dict(type=GroupNorm, num_groups=1),
+            upsample_cfg=dict(type=InterpConv)
+            )
 loss_mask = dict(
     type=CrossEntropyLoss,
     use_sigmoid=True,
@@ -81,7 +97,7 @@ model = dict(
     model=dict(type=CustomLlavaNextForConditionalGeneration.from_pretrained,
                pretrained_model_name_or_path=llava_name,
                torch_dtype=torch.bfloat16, low_cpu_mem_usage=True),
-    mask_head=dict(type=SingleConvHead),
+    mask_head=unet,
     loss_mask=loss_mask,
     loss_dice=loss_dice,
 )
@@ -119,8 +135,7 @@ datasets_list = [
          image_processor=image_processor,
          prompt_template=prompt_template,
          local_path='data/coco/train2017',
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
-         prompt=prompt),
+         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017'),
     dict(type=RefCocoDataset,
          data_root='data/coco/',
          data_prefix=dict(img_path='train2014/'),
