@@ -27,6 +27,7 @@ class FrozenDeepseekVL(BaseModel):
         super().__init__()
         with LoadWoInit():
             self.deepseek_vl = BUILDER.build(model)
+        self.deepseek_vl.requires_grad_(False)
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_token_idx = self.tokenizer.encode('<image_placeholder>', add_special_tokens=False)[-1]
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
