@@ -239,8 +239,8 @@ class FrozenMGMSAM(FrozenMGM):
         # import pdb; pdb.set_trace()
 
         meta_data = data_sample['meta_data']
-        mask_ids = outputs['mask_ids'][0]
-        attentions = [attn[0, ..., outputs['image_places'][0]]
+        mask_ids = outputs.mask_ids[0]
+        attentions = [attn[0, ..., outputs.image_places[0]]
                       for attn in outputs.attentions]
         hidden_states = outputs.hidden_states[-self.mgm.config.num_hidden_layers:]
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
