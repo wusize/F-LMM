@@ -181,7 +181,7 @@ class FrozenHPTSAM(FrozenHPT):
         mask_attentions = []
         text_embeds = []
         for mask_id in range(len(masks)):
-            matched = mask_ids == mask_id
+            matched = mask_ids[0] == mask_id
             assert matched.sum() > 0
             mask_attentions.append(
                 torch.cat(
