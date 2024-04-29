@@ -19,7 +19,8 @@ import mmcv
 import io
 from mmengine.fileio import get
 from panopticapi import utils
-from xtuner.utils.constants import IGNORE_INDEX
+from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX
+from mmengine.logging import print_log
 
 
 class PNGDataset(Dataset):
@@ -29,7 +30,9 @@ class PNGDataset(Dataset):
                  panoptic_png_path,
                  image_processor=None, tokenizer=None,
                  ceph_path=None, local_path=None, prompt_template=None,
-                 prompt='<image>\nWhat is shown in this image?'):
+                 prompt='<image>\nWhat is shown in this image?',
+                 image2tensor=True,
+                 add_image_token=False):
         super().__init__()
         with open(json_file, 'r') as f:
             self.data = json.load(f)
@@ -48,6 +51,18 @@ class PNGDataset(Dataset):
            self.image_processor = BUILDER.build(image_processor)
         else:
             self.image_processor = image_processor
+
+        self.image2tensor = image2tensor
+
+        self.add_image_token = add_image_token
+        if add_image_token:
+            special_tokens_dict = {'additional_special_tokens': ['<image>',]}
+            num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+            assert num_added_toks == 1
+
+        self.image_token_idx = self.tokenizer.encode('<image>', add_special_tokens=False)[-1]
+        print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
+
         self.prompt = self.tokenizer.encode(
             prompt_template['INSTRUCTION'].format(input=prompt),
             add_special_tokens=True)
@@ -130,7 +145,9 @@ class PNGDataset(Dataset):
         image = self.read_image(image_info['file_name'])
         image_data = self.image_processor.preprocess(image)
 
-        pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        pixel_values = image_data['pixel_values'][0]
+        if self.image2tensor:
+            pixel_values = torch.from_numpy(pixel_values)
         meta_data = image_data['meta_datas'][0]
 
         masks = torch.from_numpy(np.stack(masks))
@@ -151,6 +168,9 @@ class PNGDataset(Dataset):
         prompt_len = len(self.prompt)
         labels = torch.ones_like(input_ids) * IGNORE_INDEX
         labels[prompt_len:] = input_ids[prompt_len:]
+
+        if self.add_image_token:
+            input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
 
         return dict(input_ids=input_ids,
                     mask_ids=mask_ids,
