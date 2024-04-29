@@ -174,7 +174,7 @@ if __name__ == '__main__':
     from mmengine.config import Config
     from mmdet.datasets.transforms import LoadAnnotations
 
-    cfg = Config.fromfile('configs/fuyu/frozen_fuyu_8b_unet_sam_l.py')
+    cfg = Config.fromfile('configs/fuyu/frozen_fuyu_8b_unet_sam_l_refcoco_png.py')
     prompt_template = cfg.prompt_template
     tokenizer = cfg.tokenizer
     image_processor = cfg.image_processor
