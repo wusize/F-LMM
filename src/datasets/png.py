@@ -65,7 +65,7 @@ class PNGDataset(Dataset):
 
         self.image_token_idx = self.tokenizer.encode(self.image_token, add_special_tokens=False)[-1]
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
-        import pdb; pdb.set_trace()
+
         self.prompt = self.tokenizer.encode(
             prompt_template['INSTRUCTION'].format(input=prompt),
             add_special_tokens=True)

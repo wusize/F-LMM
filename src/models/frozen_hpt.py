@@ -141,7 +141,7 @@ class FrozenHPTSAM(FrozenHPT):
 
     def _forward(self, data_sample):
         text_layer_weights = self.get_text_layer_weights()
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         with torch.no_grad():
             pixel_values = data_sample['pixel_values'][None].to(device=self.visual_encoder.device,
                                                                 dtype=self.visual_encoder.dtype)
@@ -158,7 +158,7 @@ class FrozenHPTSAM(FrozenHPT):
         mm_inputs = prepare_inputs_labels_for_multimodal(
             llm=self.llm, input_ids=input_ids, pixel_values=pixel_values, labels=mask_ids)
         mask_ids = mm_inputs.pop('labels')
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         image_places = mask_ids[0] == IGNORE_INDEX
 
         with torch.no_grad():
