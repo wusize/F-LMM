@@ -1,18 +1,16 @@
-from transformers.image_processing_utils import BatchFeature
-from transformers.models.clip.image_processing_clip import CLIPImageProcessor
+from src.datasets.llava_processors import CustomLlavaImageProcessor
+CustomHPTImageProcessor = CustomLlavaImageProcessor
 
 
-class CustomHPTImageProcessor(CLIPImageProcessor):
-    def preprocess(self, images, **kwargs):
-        return_tensors = kwargs.pop('return_tensors', None)
-        if not isinstance(images, (list, tuple)):
-            images = [images]
-        image_sizes = [(image.height, image.width) for image in images]
-        images = super().preprocess(images, return_tensors=None, **kwargs)['pixel_values']
-        meta_datas = [dict(padding=dict(before_height=0, after_height=0, before_width=0, after_width=0),
-                           image_shape=dict(height=image.shape[1], width=image.shape[2]),
-                           padded_shape=dict(height=image.shape[1], width=image.shape[2]))
-                      for image in images]
-        data = {"pixel_values": images, "image_sizes": image_sizes, "meta_datas": meta_datas}
-
-        return BatchFeature(data=data, tensor_type=return_tensors)
+if __name__ == "__main__":
+    from PIL import Image
+    image_size = 588
+    image_processor = CustomHPTImageProcessor.from_pretrained(
+        pretrained_model_name_or_path='HyperGAI/HPT',
+        subfolder='visual_encoder',
+        size={"shortest_edge": image_size},
+        crop_size={"height": image_size, "width": image_size}
+    )
+    image = Image.open('src/datasets/000000000139.jpg')
+    image_data = image_processor.preprocess(image)
+    print(image_data.keys())

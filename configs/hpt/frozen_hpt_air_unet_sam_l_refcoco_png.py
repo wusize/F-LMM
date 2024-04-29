@@ -45,14 +45,13 @@ save_steps = 500
 save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 
 
-
 #######################################################################
 #            PART 2  Model & Tokenizer & Image Processor              #
 #######################################################################
 # Model
 prompt_template = PROMPT_TEMPLATE.internlm2_chat
 prompt = "<image>\nPlease give me a description of the image."
-image_size = 588
+image_size = 392
 hpt_name = 'HyperGAI/HPT'
 unet = dict(type=UNetHead,
             normalize_input=True,
@@ -94,7 +93,8 @@ image_processor = dict(
     type=CustomHPTImageProcessor.from_pretrained,
     pretrained_model_name_or_path=hpt_name,
     subfolder='visual_encoder',
-    do_center_crop=False, size=(image_size, image_size)
+    size={"shortest_edge": image_size},    # do padding while keeping the aspect ratio
+    crop_size={"height": image_size, "width": image_size}
 )
 
 model = dict(

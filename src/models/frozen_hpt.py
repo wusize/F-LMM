@@ -192,19 +192,17 @@ class FrozenHPTSAM(FrozenHPT):
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
 
-        pred_masks = self.mask_head(mask_attentions)  # [:, 0]
-        original_image = data_sample['image']
-        original_h, original_w = original_image.height, original_image.width
-        pred_mask_h, pred_mask_w = pred_masks.shape[-2:]
-        assert pred_mask_h == pred_mask_w
+        pred_masks = self.mask_head(mask_attentions)[:, 0]
+        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
+        meta_data = data_sample['meta_data']
+        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
+        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
 
-        if original_h > original_w:
-            pred_mask_h = int(pred_mask_h * original_h / original_w + 0.5)
-        else:
-            pred_mask_w = int(pred_mask_w * original_w / original_h + 0.5)
-
-        pred_masks = F.interpolate(pred_masks.float(),
-                                   size=(pred_mask_h, pred_mask_w), mode='bilinear').to(pred_masks)[:, 0]
+        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
+        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
+        pred_masks \
+            = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
 
         output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks,
