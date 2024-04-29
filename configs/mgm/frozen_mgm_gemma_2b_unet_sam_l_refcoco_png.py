@@ -28,12 +28,12 @@ from src.datasets.pad2square_processor import Pad2Square
 #######################################################################
 
 # Scheduler & Optimizer
-batch_size = 1  # per_device
+batch_size = 2  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
 max_epochs = 8
 optim_type = AdamW
-lr = 1e-4
+lr = 2e-4
 betas = (0.9, 0.999)
 weight_decay = 0.01
 max_norm = 1  # grad clip
