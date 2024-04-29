@@ -6,7 +6,7 @@ from mmengine.logging import print_log
 import io
 from mmcv.transforms import LoadImageFromFile, BaseTransform
 from xtuner.registry import BUILDER
-from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX
+from xtuner.utils.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 import torch
 import torch.nn.functional as F
 import copy
@@ -67,19 +67,22 @@ class RefCOCO2PNG(BaseTransform):
                  prompt='<image>\nWhat is shown in this image?',
                  concat=True,
                  image2tensor=True,
-                 add_image_token=False):
+                 add_image_token=False,
+                 image_token=DEFAULT_IMAGE_TOKEN):
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_processor = BUILDER.build(image_processor)
         self.concat = concat
         self.image2tensor = image2tensor
+        self.image_token = image_token
 
         self.add_image_token = add_image_token
         if add_image_token:
-            special_tokens_dict = {'additional_special_tokens': ['<image>', ]}
+            print_log(f"Manually add image token: {self.image_token}")
+            special_tokens_dict = {'additional_special_tokens': [self.image_token, ]}
             num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
             assert num_added_toks == 1
 
-        self.image_token_idx = self.tokenizer.encode('<image>', add_special_tokens=False)[-1]
+        self.image_token_idx = self.tokenizer.encode(self.image_token, add_special_tokens=False)[-1]
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
 
         self.prompt = self.tokenizer.encode(
