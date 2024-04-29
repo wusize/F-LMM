@@ -100,8 +100,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
     def _forward(self, data_sample):
         text_layer_weights = self.get_text_layer_weights()
         # import pdb; pdb.set_trace()
-        pixel_values = data_sample['pixel_values'][None].to(device=self.deepseek_vl.device,
-                                                            dtype=self.deepseek_vl.dtype)
+        pixel_values = data_sample['pixel_values'][None, None].to(
+            device=self.deepseek_vl.device,
+            dtype=self.deepseek_vl.dtype)
         input_ids = data_sample['input_ids'][None].to(self.deepseek_vl.device)
         images_seq_mask = input_ids == self.image_token_idx
         images_emb_mask = torch.ones((1, 1, images_seq_mask.sum()), dtype=torch.bool,
