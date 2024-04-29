@@ -174,10 +174,12 @@ class VLMImageProcessor(BaseImageProcessor):
 
         return x, meta
 
-    def preprocess(self, images, return_tensors: str = "pt", **kwargs) -> BatchFeature:
+    def preprocess(self, images, return_tensors=None, **kwargs) -> BatchFeature:
         # resize and pad to [self.image_size, self.image_size]
         # then convert from [H, W, 3] to [3, H, W]
         # images: List[np.ndarray] = [self.resize(image) for image in images]
+        if not isinstance(images, (list, tuple)):
+            images = [images]
         image_sizes = [(image.height, image.width) for image in images]
         images, meta_datas = multi_apply(self.resize, images)
 
