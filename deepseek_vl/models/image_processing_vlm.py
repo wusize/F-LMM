@@ -40,7 +40,7 @@ IMAGENET_INCEPTION_STD = (0.5, 0.5, 0.5)
 
 
 def expand2square(pil_img, background_color):
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     width, height = pil_img.size
     if width == height:
         result = pil_img
