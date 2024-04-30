@@ -7,7 +7,7 @@ import argparse
 from mmengine.config import Config
 from xtuner.model.utils import guess_load_checkpoint
 from xtuner.registry import BUILDER
-
+from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN
 from accelerate import Accelerator
 from accelerate.utils import gather_object
 from mmdet.structures.mask import BitmapMasks
@@ -68,7 +68,10 @@ if __name__ == '__main__':
         image_processor=image_processor,
         tokenizer=tokenizer,
         prompt_template=prompt_template,
-        concat=args.concat
+        concat=args.concat,
+        image2tensor=cfg.get('image2tensor', True),
+        add_image_token=cfg.get('add_image_token', False),
+        image_token=cfg.get('image_token', DEFAULT_IMAGE_TOKEN)
     )
     accelerator.print(f"Do concatenation? {args.concat}")
     if prompt is not None:

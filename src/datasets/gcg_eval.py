@@ -13,6 +13,8 @@ except:
 import pycocotools.mask as mask_utils
 from pycocotools.coco import COCO
 from xtuner.registry import BUILDER
+from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+from mmengine.logging import print_log
 
 
 class GCGEvalDataset(Dataset):
@@ -21,7 +23,11 @@ class GCGEvalDataset(Dataset):
                  mask_json_file,
                  image_processor=None, tokenizer=None,
                  ceph_path=None, local_path=None, prompt_template=None,
-                 prompt='<image>\nPlease give me a detailed description of the image.'):
+                 prompt='<image>\nPlease give me a detailed description of the image.',
+                 image2tensor=True,
+                 add_image_token=False,
+                 image_token=DEFAULT_IMAGE_TOKEN
+                 ):
         super().__init__()
         # prompt += ("If there are multiple instances of a certain object category, "
         #            "you can refer to them as object-1, object-2, object-3, etc. "
@@ -38,14 +44,28 @@ class GCGEvalDataset(Dataset):
             self.image_processor = BUILDER.build(image_processor)
         else:
             self.image_processor = image_processor
-        self.prompt = self.tokenizer.encode(
-            prompt_template['INSTRUCTION'].format(input=prompt),
-            add_special_tokens=True)
         self.prompt_template = prompt_template
 
         self.caption_data = COCO(caption_json_file)
         self.mask_data = COCO(mask_json_file)
         self.image_ids = self.caption_data.getImgIds()
+
+        self.image2tensor = image2tensor
+        self.add_image_token = add_image_token
+        self.image_token = image_token
+
+        if self.add_image_token:
+            print_log(f"Manually add image token: {self.image_token}")
+            special_tokens_dict = {'additional_special_tokens': [self.image_token, ]}
+            num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+            assert num_added_toks == 1
+
+        self.image_token_idx = self.tokenizer.encode(self.image_token, add_special_tokens=False)[-1]
+        print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
+
+        self.prompt = self.tokenizer.encode(
+            prompt_template['INSTRUCTION'].format(input=prompt),
+            add_special_tokens=True)
 
     def read_image(self, image_file):
         if self.use_ceph:
@@ -75,10 +95,18 @@ class GCGEvalDataset(Dataset):
 
         image = self.read_image(f'{image_id}.jpg')
         image_data = self.image_processor.preprocess(image)
-        pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        # pixel_values = torch.from_numpy(image_data['pixel_values'][0])
+        pixel_values = image_data['pixel_values'][0]
+        if self.image2tensor:
+            pixel_values = torch.from_numpy(pixel_values)
+
         meta_data = image_data['meta_datas'][0]
 
         input_ids = torch.tensor(self.prompt, dtype=torch.long)
+
+        if self.add_image_token:
+            input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
+
         data_sample.update(input_ids=input_ids,
                            pixel_values=pixel_values,
                            meta_data=meta_data,

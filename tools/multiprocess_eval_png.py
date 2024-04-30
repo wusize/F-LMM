@@ -9,7 +9,7 @@ from mmengine.config import Config
 from xtuner.model.utils import guess_load_checkpoint
 from accelerate import Accelerator
 from accelerate.utils import gather_object
-
+from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN
 
 accelerator = Accelerator()
 
@@ -103,7 +103,11 @@ if __name__ == '__main__':
                           image_processor=image_processor,
                           prompt_template=prompt_template,
                           local_path='data/coco/val2017',
-                          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/val2017',)
+                          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/val2017',
+                          image2tensor=cfg.get('image2tensor', True),
+                          add_image_token=cfg.get('add_image_token', False),
+                          image_token=cfg.get('image_token', DEFAULT_IMAGE_TOKEN)
+    )
     if prompt is not None:
         dataset_params.update(prompt=prompt)
     png_dataset = PNGDataset(**dataset_params)

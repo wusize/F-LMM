@@ -103,7 +103,8 @@ model = dict(
 #######################################################################
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
-
+image2tensor = False
+add_image_token = True
 backend_args = dict(
     backend='petrel',
     path_mapping=dict({
@@ -123,8 +124,8 @@ refcoco_pipeline = [
             tokenizer=tokenizer,
             prompt=prompt,
             prompt_template=prompt_template,
-            image2tensor=False,
-            add_image_token=True
+            image2tensor=image2tensor,
+            add_image_token=add_image_token
         )
     ]
 datasets_list = [
@@ -138,8 +139,8 @@ datasets_list = [
          local_path='data/coco/train2017',
          ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
          prompt=prompt,
-         image2tensor=False,
-         add_image_token=True),
+         image2tensor=image2tensor,
+         add_image_token=add_image_token),
     dict(type=RefCocoDataset,
          data_root='data/coco/',
          data_prefix=dict(img_path='train2014/'),

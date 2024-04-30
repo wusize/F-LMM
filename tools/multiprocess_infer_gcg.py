@@ -1,4 +1,5 @@
 from xtuner.model.utils import guess_load_checkpoint
+from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN
 from src.datasets.gcg_eval import GCGEvalDataset
 from accelerate import Accelerator
 from accelerate.utils import gather_object
@@ -55,7 +56,11 @@ if __name__ == '__main__':
                      ceph_path='BJ17:S3://wusize/GranDf_HA_images/val_test',
                      local_path='data/GranDf_HA_images/val_test',
                      prompt_template=gcg_wrapper.config.prompt_template,
-                     prompt=args.prompt)
+                     prompt=args.prompt,
+                     image2tensor=gcg_wrapper.config.get('image2tensor', True),
+                     add_image_token=gcg_wrapper.config.get('add_image_token', False),
+                     image_token=gcg_wrapper.config.get('image_token', DEFAULT_IMAGE_TOKEN)
+        )
 
         data_ids = list(range(len(dataset)))
         # sync GPUs and start the timer
