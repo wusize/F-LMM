@@ -6,10 +6,10 @@ from mmengine.hooks import (CheckpointHook, DistSamplerSeedHook, IterTimerHook,
 from mmengine.optim import AmpOptimWrapper, CosineAnnealingLR, LinearLR
 from torch.optim import AdamW
 from transformers import (AutoModelForCausalLM, AutoTokenizer,
-                          BitsAndBytesConfig, CLIPImageProcessor,
-                          CLIPVisionModel)
+                          CLIPImageProcessor, CLIPVisionModel)
 
-from xtuner.dataset import LLaVADataset
+# from xtuner.dataset import LLaVADataset
+from src.datasets.llava import CustomLLaVADataset
 from xtuner.dataset.collate_fns import default_collate_fn
 from xtuner.dataset.map_fns import llava_map_fn, template_map_fn_factory
 from xtuner.engine.hooks import DatasetInfoHook, EvaluateChatHook
@@ -28,6 +28,7 @@ visual_encoder_name_or_path = 'openai/clip-vit-large-patch14-336'
 data_root = './data/llava_data/'
 data_path = data_root + 'LLaVA-Pretrain/blip_laion_cc_sbu_558k.json'
 image_folder = data_root + 'LLaVA-Pretrain/images'
+ceph_folder = 'BJ17:S3://wusize/LLaVA-Pretrain/images'
 prompt_template = PROMPT_TEMPLATE.vicuna
 max_length = int(2048 - (336 / 14)**2)
 
@@ -75,16 +76,8 @@ model = dict(
         type=AutoModelForCausalLM.from_pretrained,
         pretrained_model_name_or_path=llm_name_or_path,
         trust_remote_code=True,
-        torch_dtype=torch.float16,
-        quantization_config=dict(
-            type=BitsAndBytesConfig,
-            load_in_4bit=True,
-            load_in_8bit=False,
-            llm_int8_threshold=6.0,
-            llm_int8_has_fp16_weight=False,
-            bnb_4bit_compute_dtype=torch.float16,
-            bnb_4bit_use_double_quant=True,
-            bnb_4bit_quant_type='nf4')),
+        torch_dtype=torch.bfloat16,
+    ),
     visual_encoder=dict(
         type=CLIPVisionModel.from_pretrained,
         pretrained_model_name_or_path=visual_encoder_name_or_path))
@@ -93,7 +86,8 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 llava_dataset = dict(
-    type=LLaVADataset,
+    type=CustomLLaVADataset,
+    ceph_folder=ceph_folder,
     data_path=data_path,
     image_folder=image_folder,
     tokenizer=tokenizer,
@@ -122,7 +116,7 @@ optim_wrapper = dict(
     clip_grad=dict(max_norm=max_norm, error_if_nonfinite=False),
     accumulative_counts=accumulative_counts,
     loss_scale='dynamic',
-    dtype='float16')
+    dtype='bfloat16')
 
 # learning policy
 # More information: https://github.com/open-mmlab/mmengine/blob/main/docs/en/tutorials/param_scheduler.md  # noqa: E501
