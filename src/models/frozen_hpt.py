@@ -75,8 +75,8 @@ class FrozenHPT(BaseModel):
         visual_encoder.config.image_size = self.image_size
         self.clip_shape = new_size
         self.llm = llm
-        self.visual_encoder = visual_encoder
-        self.projector = projector
+        self.visual_encoder = visual_encoder.to(llm.dtype)
+        self.projector = projector.to(llm.dtype)
         self.llm.requires_grad_(False)
         self.visual_encoder.requires_grad_(False)
         self.projector.requires_grad_(False)
