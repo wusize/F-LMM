@@ -25,7 +25,7 @@ from xtuner.utils import PROMPT_TEMPLATE
 llm_name_or_path = 'lmsys/vicuna-7b-v1.5'
 visual_encoder_name_or_path = 'openai/clip-vit-large-patch14-336'
 # Specify the pretrained pth
-pretrained_pth = './work_dirs/llava_vicuna_7b_v15_clip_vit_large_p14_336_e1_gpu8_pretrain/iter_2181.pth'  # noqa: E501
+pretrained_pth = './work_dirs/llava_v15_7b_pretrain/iter_2181.pth'
 
 # Data
 data_root = './data/llava_data/'
@@ -41,7 +41,7 @@ accumulative_counts = 1
 dataloader_num_workers = 4
 max_epochs = 1
 optim_type = AdamW
-lr = 2e-4
+lr = 2e-5
 betas = (0.9, 0.999)
 weight_decay = 0
 max_norm = 1  # grad clip
