@@ -122,3 +122,7 @@ class SAMWrapper(nn.Module):
             sam_masks.append(sam_mask)
 
         return torch.stack(sam_masks)
+
+    def state_dict(self, *args, **kwargs):
+        state_dict = super().state_dict(*args, **kwargs)
+        return {k: v for k, v in state_dict.items() if 'image_encoder' not in k}
