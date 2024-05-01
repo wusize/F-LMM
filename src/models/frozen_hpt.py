@@ -145,10 +145,13 @@ class FrozenHPTSAM(FrozenHPT):
         with torch.no_grad():
             pixel_values = data_sample['pixel_values'][None].to(device=self.visual_encoder.device,
                                                                 dtype=self.visual_encoder.dtype)
+            import pdb; pdb.set_trace()
             visual_outputs = self.visual_encoder(pixel_values, output_hidden_states=True)
+            import pdb; pdb.set_trace()
             pixel_values = self.projector(
                 visual_outputs.hidden_states[self.visual_select_layer][:, 1:].to(self.projector.dtype)
             ).to(self.llm.dtype)
+            import pdb; pdb.set_trace()
 
         input_ids = data_sample['input_ids'][None].to(self.llm.device)
         mask_ids = data_sample['mask_ids'][None].to(self.llm.device)
@@ -168,6 +171,8 @@ class FrozenHPTSAM(FrozenHPT):
                 output_attentions=True,
                 return_dict=True,
                 use_cache=False)
+
+        import pdb; pdb.set_trace()
 
         attentions = [attn[0, ..., image_places] for attn in outputs.attentions]
         attentions = [attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape) for attn in attentions]
@@ -191,8 +196,9 @@ class FrozenHPTSAM(FrozenHPT):
             text_embeds.append(self.text_proj(hidden_states[matched]))
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
-
+        import pdb; pdb.set_trace()
         pred_masks = self.mask_head(mask_attentions)[:, 0]
+        import pdb; pdb.set_trace()
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
         meta_data = data_sample['meta_data']
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
@@ -204,6 +210,7 @@ class FrozenHPTSAM(FrozenHPT):
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
+        import pdb; pdb.set_trace()
 
         output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks,
                       mask_ids=mask_ids, hidden_states=hidden_states)

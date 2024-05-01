@@ -225,8 +225,8 @@ default_hooks = dict(
     checkpoint=dict(
         type=CheckpointHook,
         by_epoch=False,
-        save_optimizer=False,
         interval=save_steps,
+        # save_optimizer=False,
         max_keep_ckpts=save_total_limit),
     # set sampler seed in distributed evrionment.
     sampler_seed=dict(type=DistSamplerSeedHook),
