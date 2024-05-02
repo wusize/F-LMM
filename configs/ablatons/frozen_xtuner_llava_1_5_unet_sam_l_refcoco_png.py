@@ -52,7 +52,7 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 # Model
 prompt_template = prompt_template
 prompt = "<image>\nPlease give me a description of the image."
-pretrained_pth = ''
+pretrained_pth = 'work_dirs/llava_vicuna_7b_v15_clip_vit_large_p14_336_e1_gpu8_finetune-vg/iter_8404.pth'
 
 unet = dict(type=UNetHead,
             normalize_input=True,
