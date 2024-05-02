@@ -17,7 +17,7 @@ from mmdet.datasets.transforms import LoadAnnotations
 from mmseg.models.backbones.unet import InterpConv
 from torch.nn import GroupNorm
 from src.models.frozen_llava_xtuner import FrozenLLaVAXtunerSAM
-
+from src.runner import CustomRunner
 from mmengine.config import read_base
 with read_base():
     from .llava_vicuna_7b_v15_clip_vit_large_p14_336_e1_gpu8_pretrain import (model, tokenizer,
@@ -26,8 +26,8 @@ with read_base():
 #######################################################################
 #                          PART 1  Settings                           #
 #######################################################################
-# runner_type = CustomRunner
-# find_unused_parameters = True
+runner_type = CustomRunner
+find_unused_parameters = True
 
 # Scheduler & Optimizer
 batch_size = 1  # per_device
@@ -214,6 +214,7 @@ default_hooks = dict(
     checkpoint=dict(
         type=CheckpointHook,
         by_epoch=False,
+        save_optimizer=False,
         interval=save_steps,
         max_keep_ckpts=save_total_limit),
     # set sampler seed in distributed evrionment.
