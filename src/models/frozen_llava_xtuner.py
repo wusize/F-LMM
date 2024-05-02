@@ -110,7 +110,6 @@ class FrozenLLaVAXtunerSAM(FrozenLLaVAXtuner):
                                    self.sam.model.prompt_encoder.embed_dim)
         self.text_layer_weights = nn.Parameter(
             torch.ones(self.llm.config.num_hidden_layers))
-        import pdb; pdb.set_trace()
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
