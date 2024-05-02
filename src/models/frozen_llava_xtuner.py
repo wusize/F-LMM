@@ -99,7 +99,7 @@ class FrozenLLaVAXtuner(LLaVAModel):
 
     @property
     def clip_shape(self):
-        return self.visual_encoder.image_size // self.patch_size
+        return self.visual_encoder.config.image_size // self.patch_size
 
 
 class FrozenLLaVAXtunerSAM(FrozenLLaVAXtuner):
