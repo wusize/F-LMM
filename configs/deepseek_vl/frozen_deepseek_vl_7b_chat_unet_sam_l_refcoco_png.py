@@ -57,7 +57,7 @@ prompt_template = dict(
     STOP_WORDS=['<｜end▁of▁sentence｜>']
 )
 prompt = '<image_placeholder>'*576 + "Please give me a description of the image."
-deepseek_vl_name = "deepseek-ai/deepseek-vl-7b-chat"
+lmm_name = deepseek_vl_name = "deepseek-ai/deepseek-vl-7b-chat"
 unet = dict(type=UNetHead,
             normalize_input=True,
             upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)

@@ -47,7 +47,8 @@ if __name__ == '__main__':
     model._prepare_for_generation(image_processor=image_processor,
                                   prompt_template=prompt_template,
                                   max_thought_tokens=16,
-                                  max_new_tokens=512)
+                                  max_new_tokens=512,
+                                  lmm_name=cfg.lmm_name)
     model = model.to(device=accelerator.device)
     model.eval()
 

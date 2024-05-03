@@ -228,7 +228,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                 prompt_template,
                                 max_thought_tokens,
                                 max_new_tokens,
+                                lmm_name='',
                                 **kwargs):
+        from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
         from xtuner.utils import StopWordStoppingCriteria
         if isinstance(image_processor, dict):
@@ -236,6 +238,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         else:
             self.image_processor = image_processor
 
+        self.vl_chat_processor = VLChatProcessor.from_pretrained(lmm_name)
         self.prompt_template = prompt_template
         self.max_thought_tokens = max_thought_tokens
         self.max_new_tokens = max_new_tokens
@@ -330,69 +333,20 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         bbox = self.mask2box(pred_mask > 0.0)
 
         # 3. crop the object from the image and answer the question
-        image = image.crop(bbox)
-        return thought, bbox, self.visual_cot_v3(image, question)[-1]
+        image_crop = image.crop(bbox)
 
-        # prompt = self.prompt_template['INSTRUCTION'].format(
-        #     input='<image_placeholder>' * 576 + 'This is the cropped image region of the object. Now answer the '
-        #                                         'question using a single word or phrase.')
-        # prompt = self.tokenizer.eos_token + prompt   # eos is to end the previous answer
-        # input_ids = self.tokenizer.encode(prompt,
-        #                                   add_special_tokens=False,   # bos not needed
-        #                                   return_tensors='pt').to(self.deepseek_vl.device)
-        # image_data = self.image_processor.preprocess(image)
-        # pixel_values = image_data['pixel_values'][0]
-        # pixel_values = torch.from_numpy(pixel_values)
-        # pixel_values = pixel_values[None, None].to(
-        #     device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
-        # images_seq_mask = input_ids == self.image_token_idx
-        # assert images_seq_mask.sum() == 576
-        # images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
-        #                              device=self.deepseek_vl.device)
-        # inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
-        #     input_ids=input_ids,
-        #     pixel_values=pixel_values,
-        #     images_seq_mask=images_seq_mask,
-        #     images_emb_mask=images_emb_mask)
-        # ## 3.1 pass the inputs first as the inputs_embeds conflict with past_key_values in generation
-        # outputs = self.deepseek_vl.language_model(
-        #     inputs_embeds=inputs_embeds,
-        #     past_key_values=past_key_values,
-        #     return_dict=True,
-        #     use_cache=True)
-        #
-        # output_ids = outputs.logits[:, -1:].argmax(dim=-1)    # the first id of the answer
-        # ## 3.2 generate final answer
-        # all_output_ids = [output_ids[0, 0].item()]
-        # while len(all_output_ids) < self.max_new_tokens:
-        #     outputs = self.deepseek_vl.language_model(
-        #         input_ids=output_ids,
-        #         past_key_values=outputs.past_key_values,
-        #         return_dict=True,
-        #         use_cache=True)
-        #     output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
-        #     assert output_ids.shape[1] == 1
-        #     if output_ids[0, 0].item() in self.stop_word_ids:
-        #         break
-        #     all_output_ids.append(output_ids[0, 0].item())
-        #
-        # # TODO: fix the bug in using generate function
-        # # output_ids = self.deepseek_vl.language_model.generate(
-        # #     input_ids=start_id,
-        # #     attention_mask=torch.ones(1, 1 + past_key_values[0][0].shape[2],
-        # #                               device=self.deepseek_vl.device,
-        # #                               dtype=torch.long),
-        # #     past_key_values=past_key_values,
-        # #     pad_token_id=self.tokenizer.eos_token_id,
-        # #     eos_token_id=self.tokenizer.eos_token_id,
-        # #     max_new_tokens=self.max_new_tokens,
-        # #     do_sample=False,
-        # #     use_cache=True,
-        # # )[0]
-        #
-        # answer = self.tokenizer.decode(all_output_ids, skip_special_tokens=True)
-        #
-        # return thought, bbox, answer
+        # multiple images (or in-context learning) conversation example
+        conversation = [
+            {
+                "role": "User",
+                "content": f"<image_placeholder>the whole image, "
+                           f"<image_placeholder>the image region that might help you answer the question: "
+                           f"{question} Please brief answer the question.",
+                "images": ["image", "image",],
+            },
+            {"role": "Assistant", "content": ""}
+        ]
+        return thought, bbox, self.conversation(conversation, [image, image_crop])
 
     @torch.no_grad()
     def visual_cot_v2(self, image, question):
@@ -457,58 +411,20 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         # 2. append the cropped image
         bbox = self.mask2box(pred_mask > 0.0)
-        image = image.crop(bbox)
-        return '', bbox, self.visual_cot_v3(image, question)[-1]
+        image_crop = image.crop(bbox)
 
-        # inserted_input_ids = self.tokenizer.encode(
-        #     '<image_placeholder>' * 576 + 'This is the cropped image region of the object relevant '
-        #                                   'to the above question. Now answer the question using a '
-        #                                   'single word or phrase.',
-        #     return_tensors='pt', add_special_tokens=False).to(self.deepseek_vl.device)
-        #
-        # appended_input_ids = torch.cat(
-        #     [inserted_input_ids, input_ids[:, question_end_place + 1:]], dim=1)
-        #
-        # image_data = self.image_processor.preprocess(image)
-        # pixel_values = image_data['pixel_values'][0]
-        # pixel_values = torch.from_numpy(pixel_values)
-        # pixel_values = pixel_values[None, None].to(
-        #     device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
-        # images_seq_mask = appended_input_ids == self.image_token_idx
-        # assert images_seq_mask.sum() == 576
-        # images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
-        #                              device=self.deepseek_vl.device)
-        # appended_inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
-        #     input_ids=appended_input_ids,
-        #     pixel_values=pixel_values,
-        #     images_seq_mask=images_seq_mask,
-        #     images_emb_mask=images_emb_mask)
-        #
-        # ## 3.1 pass the inputs first as the inputs_embeds conflict with past_key_values in generation
-        # outputs = self.deepseek_vl.language_model(
-        #     inputs_embeds=appended_inputs_embeds,
-        #     past_key_values=past_key_values,
-        #     return_dict=True,
-        #     use_cache=True)
-        #
-        # output_ids = outputs.logits[:, -1:].argmax(dim=-1)    # the first id of the answer
-        # ## 3.2 generate final answer
-        # all_output_ids = [output_ids[0, 0].item()]
-        # while len(all_output_ids) < self.max_new_tokens:
-        #     outputs = self.deepseek_vl.language_model(
-        #         input_ids=output_ids,
-        #         past_key_values=outputs.past_key_values,
-        #         return_dict=True,
-        #         use_cache=True)
-        #     output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
-        #     assert output_ids.shape[1] == 1
-        #     if output_ids[0, 0].item() in self.stop_word_ids:
-        #         break
-        #     all_output_ids.append(output_ids[0, 0].item())
-        #
-        # answer = self.tokenizer.decode(all_output_ids, skip_special_tokens=True)
-        #
-        # return '', bbox, answer
+        # multiple images (or in-context learning) conversation example
+        conversation = [
+            {
+                "role": "User",
+                "content": f"<image_placeholder>the whole image, "
+                           f"<image_placeholder>the image region that might help you answer the question: "
+                           f"{question} Please brief answer the question.",
+                "images": ["image", "image",],
+            },
+            {"role": "Assistant", "content": ""}
+        ]
+        return '', bbox, self.conversation(conversation, [image, image_crop])
 
     @staticmethod
     def mask2box(mask, scale=1.0):
@@ -521,11 +437,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             y0, y1 = ys.min().item(), ys.max().item()
             x0, x1 = xs.min().item(), xs.max().item()
 
-            yd, xd = (y1 - y0) / 2, (x1 - x0) / 2
+            yd, xd = max((y1 - y0) / 2, 8), max((x1 - x0) / 2, 8)
             yc, xc = (y1 + y0) / 2, (x1 + x0) / 2
-
-            if yd < 4 or xd < 4:    # invalid, use whole image
-                return 0, 0, w, h
 
             x0, x1 = max(0, xc - xd * scale), min(w, xc + xd * scale)
             y0, y1 = max(0, yc - yd * scale), min(h, yc + yd * scale)
@@ -536,39 +449,39 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
     def visual_cot_v3(self, image, question):
         # v3: the baseline, no cot
         assert self._generation_ready
-        prompt = self.prompt_template['INSTRUCTION'].format(
-            input='<image_placeholder>' * 576 + question +
-                  ' Answer the question using a single word or phrase.')
-        input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
-        image_data = self.image_processor.preprocess(image)
-        pixel_values = image_data['pixel_values'][0]
-        pixel_values = torch.from_numpy(pixel_values)
-        pixel_values = pixel_values[None, None].to(
-            device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
-        images_seq_mask = input_ids == self.image_token_idx
-        assert images_seq_mask.sum() == 576
-        images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
-                                     device=self.deepseek_vl.device)
-        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
-            input_ids=input_ids,
-            pixel_values=pixel_values,
-            images_seq_mask=images_seq_mask,
-            images_emb_mask=images_emb_mask)
+        # single image conversation example
+        conversation = [
+            {
+                "role": "User",
+                "content": f"<image_placeholder>{question} "
+                           f"Please brief answer the question.",
+                "images": ["image"],
+            },
+            {"role": "Assistant", "content": ""},
+        ]
+        return '', (0, 0, image.width, image.height), self.conversation(conversation, [image])
 
-        output_ids = self.deepseek_vl.language_model.generate(
+    def conversation(self, conversation, images):
+        # prepare for inputs
+        prepare_inputs = self.vl_chat_processor(
+            conversations=conversation, images=images, force_batchify=True
+        ).to(self.deepseek_vl.device)
+
+        # run image encoder to get the image embeddings
+        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(**prepare_inputs)
+
+        # run the model to get the response
+        outputs = self.deepseek_vl.language_model.generate(
             inputs_embeds=inputs_embeds,
-            attention_mask=torch.ones_like(input_ids),
+            attention_mask=prepare_inputs.attention_mask,
             pad_token_id=self.tokenizer.eos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
-            stopping_criteria=self.stop_criteria,
             max_new_tokens=self.max_new_tokens,
             do_sample=False,
             use_cache=True,
-        )[0]
-
-        answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
-
-        return '', (0, 0, image.width, image.height), answer
+        )
+        answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return answer
 
 
 if __name__ == '__main__':
