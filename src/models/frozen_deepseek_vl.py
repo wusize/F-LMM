@@ -499,7 +499,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         return '', bbox, answer
 
     @staticmethod
-    def mask2box(mask, scale=1.5):
+    def mask2box(mask, scale=1.0):
         h, w = mask.shape
         assert mask.dtype == torch.bool
         ys, xs = torch.where(mask)
