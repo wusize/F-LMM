@@ -79,7 +79,8 @@ if __name__ == '__main__':
                 results.append(dict(thought=thought,
                                     box=box,
                                     answer=answer,
-                                    question_id=data_sample['question_id']))
+                                    question_id=data_sample['question_id'],
+                                    gt=data_sample['conversations'][-1]['value']))
             results = gather_object(results)
         if accelerator.is_main_process:
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
