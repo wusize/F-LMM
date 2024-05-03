@@ -417,8 +417,11 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
+        import pdb; pdb.set_trace()
         outputs = self.deepseek_vl.language_model(
             inputs_embeds=inputs_embeds,
+            output_hidden_states=True,
+            output_attentions=True,
             return_dict=True,
             use_cache=True)
         past_key_values = outputs.past_key_values
