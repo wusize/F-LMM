@@ -51,7 +51,11 @@ save_total_limit = 1  # Maximum checkpoints to keep (-1 means unlimited)
 prompt_template = dict(
     SYSTEM='',
     INSTRUCTION='User: {input}\n\nAssistant:',
-    SEP='\n')
+    SUFFIX='<｜end▁of▁sentence｜>',
+    SUFFIX_AS_EOS=True,
+    SEP='\n',
+    STOP_WORDS=['<｜end▁of▁sentence｜>']
+)
 prompt = '<image_placeholder>'*576 + "Please give me a description of the image."
 deepseek_vl_name = "deepseek-ai/deepseek-vl-1.3b-chat"
 unet = dict(type=UNetHead,

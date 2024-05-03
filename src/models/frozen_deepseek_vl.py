@@ -1,7 +1,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 from xtuner.model.utils import LoadWoInit
 from mmengine.logging import print_log
@@ -41,6 +40,7 @@ class FrozenDeepseekVL(BaseModel):
         self.loss_dice = BUILDER.build(loss_dice)
         self.patch_size = 16   # hard-code use siglip_large_patch16_384
         self.clip_shape = 24
+        self._generation_ready = False
 
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
@@ -221,3 +221,80 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                      }
 
         return loss_dict
+
+    def _prepare_for_generation(self,
+                                image_processor,
+                                prompt_template,
+                                max_thought_tokens,
+                                max_new_tokens,
+                                **kwargs):
+        if isinstance(image_processor, dict):
+            self.image_processor = BUILDER.build(image_processor)
+        else:
+            self.image_processor = image_processor
+
+        self.prompt_template = prompt_template
+        self.max_thought_tokens = max_thought_tokens
+        self.max_new_tokens = max_new_tokens
+        self._generation_ready = True
+
+    @torch.no_grad()
+    def visual_cot(self, image, question):
+        assert self._generation_ready
+        prompt = self.prompt_template['INSTRUCTION'].format(
+            input=question + 'First think what region or object in the image you need to look at '
+                             'to answer the question.')
+        prompt += 'To answer the question, I need to look at'
+        assert prompt.count('<image_placeholder>') == 1
+        prompt = prompt.replace('<image_placeholder>', '<image_placeholder>' * 576)
+        input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
+        image_data = self.image_processor.preprocess(image)
+        pixel_values = image_data['pixel_values'][0]
+        pixel_values = torch.from_numpy(pixel_values)
+
+        pixel_values = pixel_values[None, None].to(
+            device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
+        images_seq_mask = input_ids == self.image_token_idx
+        assert images_seq_mask.sum() == 576
+        images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
+                                     device=self.deepseek_vl.device)
+
+        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            images_seq_mask=images_seq_mask,
+            images_emb_mask=images_emb_mask)
+
+        outputs = self.deepseek_vl.language_model.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=torch.ones_like(input_ids),
+            pad_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=self.max_thought_tokens,
+            do_sample=False,
+            use_cache=True,
+            return_dict_in_generate=True,
+        )
+        import pdb; pdb.set_trace()
+        return outputs
+
+
+if __name__ == '__main__':
+    from PIL import Image
+    from xtuner.registry import BUILDER
+    from xtuner.model.utils import guess_load_checkpoint
+    from mmengine.config import Config
+    image = Image.open('images/dog_a.png')
+    question = "What category does the dog belong to?"
+
+    cfg = Config.fromfile('configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py')
+    model = BUILDER.build(cfg.model)
+    import pdb; pdb.set_trace()
+    model.load_state_dict(guess_load_checkpoint('checkpoints/frozen_deepseek_vl_1_3b_unet_sam_l_iter_95080.pth'))
+    model._prepare_for_generation(image_processor=cfg.image_processor,
+                                  prompt_template=cfg.prompt_template,
+                                  max_thought_tokens=16,
+                                  max_new_tokens=512)
+    model = model.cuda().eval()
+    output = model.visual_cot(image, question)
+
