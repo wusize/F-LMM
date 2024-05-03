@@ -255,7 +255,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         # 1. Round one: prompt the llm to find the most relevant object
         import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
-            input=question + 'First think which object in this image is most relevant to the question.')
+            input='<image_placeholder>' + question + 'First think which object in this image is most relevant to the question.')
         prompt += 'The object most relevant to the question is'
         assert prompt.count('<image_placeholder>') == 1
         prompt = prompt.replace('<image_placeholder>', '<image_placeholder>' * 576)
@@ -336,8 +336,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         image = image.crop(bbox)
         import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
-            input='<image_placeholder>' * 576 + 'This is the cropped image region of the object.'
-                  + question.replace('<image_placeholder>', ''))
+            input='<image_placeholder>' * 576 + 'This is the cropped image region of the object.' + question)
         prompt = self.tokenizer.eos_token + prompt   # eos is to end the previous answer
         input_ids = self.tokenizer.encode(prompt,
                                           add_special_tokens=False,   # bos not needed
@@ -388,8 +387,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
     def visual_cot_v2(self, image, question):
         # v2: dirrecly ground the whole question
         assert self._generation_ready
-        assert question.count('<image_placeholder>') == 1
-        question_repeated = question.replace('<image_placeholder>', '<image_placeholder>' * 576)
+        question_repeated = '<image_placeholder>' * 576 + question
         prompt = self.prompt_template['INSTRUCTION'].format(
             input=question_repeated + '<image_placeholder>')  # temporarily insert this special token to locate the question
         input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
