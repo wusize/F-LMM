@@ -285,7 +285,7 @@ if __name__ == '__main__':
     from xtuner.model.utils import guess_load_checkpoint
     from mmengine.config import Config
     image = Image.open('images/dog_a.png')
-    question = "What category does the dog belong to?"
+    question = "<image_placeholder>What category does the dog belong to?"
 
     cfg = Config.fromfile('configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py')
     model = BUILDER.build(cfg.model)
