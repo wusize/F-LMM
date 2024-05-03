@@ -253,6 +253,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         # v1: let the llm first describe the most relevant object
         assert self._generation_ready
         # 1. Round one: prompt the llm to find the most relevant object
+        import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
             input=question + 'First think which object in this image is most relevant to the question.')
         prompt += 'The object most relevant to the question is'
@@ -274,7 +275,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
-
+        import pdb; pdb.set_trace()
         outputs = self.deepseek_vl.language_model.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=torch.ones_like(input_ids),
@@ -288,6 +289,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             use_cache=True,
             return_dict_in_generate=True,
         )
+        import pdb; pdb.set_trace()
         output_ids = outputs.sequences[0, :-1]    # discard the last one
         thought = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         past_key_values = outputs.past_key_values
@@ -327,11 +329,12 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         pred_mask = self.sam(image, pred_masks, text_embeds)[0]
+        import pdb; pdb.set_trace()
         bbox = self.mask2box(pred_mask > 0.0)
 
         # 3. crop the object from the image and answer the question
         image = image.crop(bbox)
-
+        import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
             input='<image_placeholder>' * 576 + 'This is the cropped image region of the object.'
                   + question.replace('<image_placeholder>', ''))
@@ -353,7 +356,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
-
+        import pdb; pdb.set_trace()
         ## 3.1 pass the inputs first as the inputs_embeds conflict with past_key_values in generation
         outputs = self.deepseek_vl.language_model(
             inputs_embeds=inputs_embeds,
@@ -364,7 +367,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         logits = outputs.logits
         past_key_values = outputs.past_key_values   # updateed cache
         start_id = logits[:, -1:].argmax(dim=-1)    # the first id of the answer
-
+        import pdb; pdb.set_trace()
         ## 3.2 generate final answer
         output_ids = self.deepseek_vl.language_model.generate(
             input_ids=start_id,

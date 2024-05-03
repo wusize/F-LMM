@@ -15,7 +15,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default='', type=str)
-    parser.add_argument('--image_folder', default='', type=str)
+    parser.add_argument('--image_folder', default='data', type=str)
     parser.add_argument('--version', default='v1', type=str)
     parser.add_argument('--save_folder', default='visual_cot/results_v1', type=str)
     parser.add_argument('--debug', action='store_true')
