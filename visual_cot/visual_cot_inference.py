@@ -1,6 +1,6 @@
 import argparse
 import json
-import os.path
+import os
 from glob import glob
 from accelerate import Accelerator
 from tqdm import tqdm
@@ -80,7 +80,7 @@ if __name__ == '__main__':
             results = gather_object(results)
         if accelerator.is_main_process:
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
-            os.makedirs(args.save_folder)
+            os.makedirs(args.save_folder, exist_ok=True)
 
             with open(os.path.join(args.save_folder, os.path.basename(json_file)), 'w') as f:
                 json.dump(results, f)
