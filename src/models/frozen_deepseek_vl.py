@@ -1,6 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 from xtuner.model.utils import LoadWoInit
 from mmengine.logging import print_log
@@ -281,7 +282,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
 if __name__ == '__main__':
     from PIL import Image
-    from xtuner.registry import BUILDER
     from xtuner.model.utils import guess_load_checkpoint
     from mmengine.config import Config
     image = Image.open('images/dog_a.png')
