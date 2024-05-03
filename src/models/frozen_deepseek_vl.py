@@ -370,7 +370,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         ## 3.2 generate final answer
         output_ids = self.deepseek_vl.language_model.generate(
             input_ids=start_id,
-            attention_mask=None,
+            attention_mask=torch.ones(1, 1+past_key_values[0][0].shape[1]),
             past_key_values=past_key_values,
             pad_token_id=self.tokenizer.eos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
@@ -483,7 +483,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         ## 3.2 generate final answer
         output_ids = self.deepseek_vl.language_model.generate(
             input_ids=start_id,
-            attention_mask=None,
+            attention_mask=torch.ones(1, 1+past_key_values[0][0].shape[1]),
             past_key_values=past_key_values,
             pad_token_id=self.tokenizer.eos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
