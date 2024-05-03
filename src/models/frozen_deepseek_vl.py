@@ -242,6 +242,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         stop_words = self.prompt_template.get('STOP_WORDS', []) + ['.']   # only need the first sentence
         self.stop_criteria = StoppingCriteriaList()
+        self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
+                              for word in stop_words]
+        import pdb; pdb.set_trace()
         for word in stop_words:
             self.stop_criteria.append(
                 StopWordStoppingCriteria(self.tokenizer, word))
@@ -367,7 +370,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 use_cache=True)
             output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
             assert output_ids.shape[1] == 1
-            if output_ids[0, 0] == self.tokenizer.eos_token_id:
+            if output_ids[0, 0].item() in self.stop_word_ids:
                 break
             all_output_ids.append(output_ids[0, 0].item())
 
@@ -495,7 +498,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 use_cache=True)
             output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
             assert output_ids.shape[1] == 1
-            if output_ids[0, 0] == self.tokenizer.eos_token_id:
+            if output_ids[0, 0].item() in self.stop_word_ids:
                 break
             all_output_ids.append(output_ids[0, 0].item())
 
