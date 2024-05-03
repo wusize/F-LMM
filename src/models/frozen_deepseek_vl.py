@@ -395,7 +395,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         assert self._generation_ready
         prompt = self.prompt_template['INSTRUCTION'].format(
             input='<image_placeholder>' * 576 + question + '<image_placeholder>')  # temporarily insert this special token to locate the question
-        import pdb; pdb.set_trace()
         input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
         image_places = torch.where(input_ids[0] == self.image_token_idx)[0]
         question_start_place = image_places[-2] + 1
@@ -417,7 +416,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
-        import pdb; pdb.set_trace()
         outputs = self.deepseek_vl.language_model(
             inputs_embeds=inputs_embeds,
             output_hidden_states=True,
@@ -454,7 +452,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         # 2. append the cropped image
         bbox = self.mask2box(pred_mask > 0.0)
-        import pdb; pdb.set_trace()
         image = image.crop(bbox)
 
         inserted_input_ids = self.tokenizer.encode(
@@ -464,7 +461,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         appended_input_ids = torch.cat(
             [inserted_input_ids, input_ids[:, question_end_place + 1:]], dim=1)
-        import pdb; pdb.set_trace()
 
         image_data = self.image_processor.preprocess(image)
         pixel_values = image_data['pixel_values'][0]
@@ -491,7 +487,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         output_ids = outputs.logits[:, -1:].argmax(dim=-1)    # the first id of the answer
         ## 3.2 generate final answer
         all_output_ids = [output_ids[0, 0].item()]
-        import pdb; pdb.set_trace()
         while len(all_output_ids) < self.max_new_tokens:
             outputs = self.deepseek_vl.language_model(
                 input_ids=output_ids,
