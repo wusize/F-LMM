@@ -244,7 +244,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         self.stop_criteria = StoppingCriteriaList()
         self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
                               for word in stop_words]
-        import pdb; pdb.set_trace()
         for word in stop_words:
             self.stop_criteria.append(
                 StopWordStoppingCriteria(self.tokenizer, word))
@@ -558,7 +557,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         )[0]
 
         answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
-        import pdb; pdb.set_trace()
 
         return '', (0, 0, image.width, image.height), answer
 
