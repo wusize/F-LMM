@@ -516,7 +516,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             y0, y1 = ys.min().item(), ys.max().item()
             x0, x1 = xs.min().item(), xs.max().item()
 
-            yd, xd = (y1 - y0) / 2, (x1 - x0) / 2
+            yd, xd = max((y1 - y0) / 2, 8), max((x1 - x0) / 2, 8)
             yc, xc = (y1 + y0) / 2, (x1 + x0) / 2
 
             x0, x1 = max(0, xc - xd * scale), min(w, xc + xd * scale)
