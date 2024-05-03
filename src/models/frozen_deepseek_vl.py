@@ -530,7 +530,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
     def visual_cot_v3(self, image, question):
         # v3: the baseline, no cot
         assert self._generation_ready
-        prompt = self.prompt_template['INSTRUCTION'].format(input='<image_placeholder>' * 576 + question)
+        prompt = self.prompt_template['INSTRUCTION'].format(
+            input='<image_placeholder>' * 576 + question +
+                  ' Answer the question using a single word or phrase.')
         input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
         image_data = self.image_processor.preprocess(image)
         pixel_values = image_data['pixel_values'][0]
