@@ -332,7 +332,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         # 3. crop the object from the image and answer the question
         image = image.crop(bbox)
         prompt = self.prompt_template['INSTRUCTION'].format(
-            input='<image_placeholder>' * 576 + 'This is the cropped image region of the object. ' + question)
+            input='<image_placeholder>' * 576 + 'This is the cropped image region of the object. Now answer the '
+                                                'question using a single word or phrase.')
         prompt = self.tokenizer.eos_token + prompt   # eos is to end the previous answer
         input_ids = self.tokenizer.encode(prompt,
                                           add_special_tokens=False,   # bos not needed
@@ -458,7 +459,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         inserted_input_ids = self.tokenizer.encode(
             '<image_placeholder>' * 576 + 'This is the cropped image region of the object relevant '
-                                          'to the above question. Now answer the question.',
+                                          'to the above question. Now answer the question using a '
+                                          'single word or phrase.',
             return_tensors='pt', add_special_tokens=False).to(self.deepseek_vl.device)
 
         appended_input_ids = torch.cat(
