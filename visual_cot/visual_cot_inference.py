@@ -17,10 +17,12 @@ if __name__ == '__main__':
     parser.add_argument('--checkpoint', default='', type=str)
     parser.add_argument('--image_folder', default='data', type=str)
     parser.add_argument('--version', default='v1', type=str)
-    parser.add_argument('--save_folder', default='visual_cot/results_v1', type=str)
+    parser.add_argument('--save_folder', default='visual_cot/results', type=str)
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
     accelerator = Accelerator()
+
+    args.save_folder = f"{args.save_folder}_{args.version}"
 
     message = [f"Hello this is GPU {accelerator.process_index}"]
     # collect the messages from all GPUs

@@ -522,6 +522,42 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
             return int(x0), int(y0), int(x1), int(y1)
 
+    @torch.no_grad()
+    def visual_cot_v3(self, image, question):
+        # v3: the baseline, no cot
+        assert self._generation_ready
+        prompt = self.prompt_template['INSTRUCTION'].format(input='<image_placeholder>' * 576 + question)
+        input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
+        image_data = self.image_processor.preprocess(image)
+        pixel_values = image_data['pixel_values'][0]
+        pixel_values = torch.from_numpy(pixel_values)
+        pixel_values = pixel_values[None, None].to(
+            device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
+        images_seq_mask = input_ids == self.image_token_idx
+        assert images_seq_mask.sum() == 576
+        images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
+                                     device=self.deepseek_vl.device)
+        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            images_seq_mask=images_seq_mask,
+            images_emb_mask=images_emb_mask)
+
+        output_ids = self.deepseek_vl.language_model.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=torch.ones_like(input_ids),
+            pad_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=self.max_new_tokens,
+            do_sample=False,
+            use_cache=True,
+        )[0]
+
+        answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+        import pdb; pdb.set_trace()
+
+        return '', (0, 0, image.width, image.height), answer
+
 
 if __name__ == '__main__':
     from PIL import Image
