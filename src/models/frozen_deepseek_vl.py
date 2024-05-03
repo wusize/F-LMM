@@ -495,7 +495,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
 
-        return bbox, answer
+        return '', bbox, answer
 
     @staticmethod
     def mask2box(mask, scale=1.5):

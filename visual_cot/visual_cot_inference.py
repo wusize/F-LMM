@@ -1,21 +1,23 @@
 import argparse
 import json
+import os.path
 from glob import glob
 from accelerate import Accelerator
 from tqdm import tqdm
-import torch
 from accelerate.utils import gather_object
 from mmengine.config import Config
 from xtuner.registry import BUILDER
-from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN
+from PIL import Image
 from xtuner.model.utils import guess_load_checkpoint
 
-accelerator = Accelerator()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
-    parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--checkpoint', default='', type=str)
+    parser.add_argument('--image_folder', default='', type=str)
+    parser.add_argument('--version', default='v1', type=str)
+    parser.add_argument('--save_folder', default='visual_cot/results_v1', type=str)
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
     accelerator = Accelerator()
@@ -34,10 +36,13 @@ if __name__ == '__main__':
 
     print(f'Device: {accelerator.device}', flush=True)
     model = BUILDER.build(cfg.model)
-    if args.checkpoint is not None:
-        state_dict = guess_load_checkpoint(args.checkpoint)
-        missing, unexpected = model.load_state_dict(state_dict, strict=False)
-        accelerator.print(f"Unexpected parameters: {unexpected}")
+    state_dict = guess_load_checkpoint(args.checkpoint)
+    missing, unexpected = model.load_state_dict(state_dict, strict=False)
+    accelerator.print(f"Unexpected parameters: {unexpected}")
+    model._prepare_for_generation(image_processor=image_processor,
+                                  prompt_template=prompt_template,
+                                  max_thought_tokens=16,
+                                  max_new_tokens=512)
     model = model.to(device=accelerator.device)
     model.eval()
 
@@ -53,13 +58,27 @@ if __name__ == '__main__':
         if args.debug:
             data_ids = data_ids[::100]
 
+        results = []
         with accelerator.split_between_processes(data_ids) as sub_ids:
             for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
                 data_sample = data[idx]
-                with torch.no_grad():
-                    pred_mask_logits = model.predict(data_sample)
-                masks = data_sample['gt_masks'].to(pred_mask_logits.device)
-                gt_masks = masks.float().cpu()
+                image = Image.open(os.path.join(args.image_folder, data_sample['image'][0]))
+                question = data_sample['conversations'][0]['value'].replace(
+                    'Please provide the bounding box coordinate '
+                    'of the region that can help you answer the question better.',
+                    ''
+                )
+                question = question.replace('<image>', '').strip()
 
+                thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question)
+                results.append(dict(thought=thought,
+                                    box=box,
+                                    answer=answer,
+                                    question_id=data_sample['question_id']))
+            results = gather_object(results)
+        if accelerator.is_main_process:
+            accelerator.print(f"Collected {len(results)} result samples from all gpus")
+            os.makedirs(args.save_folder)
 
-
+            with open(os.path.join(args.save_folder, os.path.basename(json_file)), 'w') as f:
+                json.dump(results, f)
