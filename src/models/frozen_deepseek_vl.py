@@ -363,25 +363,37 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             return_dict=True,
             use_cache=True)
 
-        logits = outputs.logits
         past_key_values = outputs.past_key_values   # updateed cache
-        start_id = logits[:, -1:].argmax(dim=-1)    # the first id of the answer
+        output_ids = outputs.logits[:, -1:].argmax(dim=-1)    # the first id of the answer
         import pdb; pdb.set_trace()
         ## 3.2 generate final answer
-        output_ids = self.deepseek_vl.language_model.generate(
-            input_ids=start_id,
-            attention_mask=torch.ones(1, 1 + past_key_values[0][0].shape[2],
-                                      device=self.deepseek_vl.device,
-                                      dtype=torch.long),
-            past_key_values=past_key_values,
-            pad_token_id=self.tokenizer.eos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            max_new_tokens=self.max_new_tokens,
-            do_sample=False,
-            use_cache=True,
-        )[0]
+        all_output_ids = [output_ids[0, 0].item()]
+        while len(all_output_ids) < self.max_new_tokens:
+            outputs = self.deepseek_vl.language_model(
+                inputs_embeds=inputs_embeds,
+                past_key_values=past_key_values,
+                return_dict=True,
+                use_cache=True)
+            output_ids = outputs.logits[:, -1:].argmax(dim=-1)  # the first id of the answer
+            if output_ids[0, 0] == self.tokenizer.eos_token_id:
+                break
+            all_output_ids.append(output_ids[0, 0].item())
+            past_key_values = outputs.past_key_values  # updateed cache
 
-        answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+        # output_ids = self.deepseek_vl.language_model.generate(
+        #     input_ids=start_id,
+        #     attention_mask=torch.ones(1, 1 + past_key_values[0][0].shape[2],
+        #                               device=self.deepseek_vl.device,
+        #                               dtype=torch.long),
+        #     past_key_values=past_key_values,
+        #     pad_token_id=self.tokenizer.eos_token_id,
+        #     eos_token_id=self.tokenizer.eos_token_id,
+        #     max_new_tokens=self.max_new_tokens,
+        #     do_sample=False,
+        #     use_cache=True,
+        # )[0]
+
+        answer = self.tokenizer.decode(all_output_ids, skip_special_tokens=True)
 
         return thought, bbox, answer
 
