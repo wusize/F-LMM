@@ -102,7 +102,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
     def _forward(self, data_sample):
         text_layer_weights = self.get_text_layer_weights()
-        # import pdb; pdb.set_trace()
         pixel_values = data_sample['pixel_values'][None, None].to(
             device=self.deepseek_vl.device,
             dtype=self.deepseek_vl.dtype)
@@ -253,7 +252,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         # v1: let the llm first describe the most relevant object
         assert self._generation_ready
         # 1. Round one: prompt the llm to find the most relevant object
-        import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
             input='<image_placeholder>' + question + 'First think which object in this image is most relevant to the question.')
         prompt += ' The object most relevant to the question is'
@@ -275,7 +273,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
-        import pdb; pdb.set_trace()
         outputs = self.deepseek_vl.language_model.generate(
             inputs_embeds=inputs_embeds,
             attention_mask=torch.ones_like(input_ids),
@@ -289,7 +286,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             use_cache=True,
             return_dict_in_generate=True,
         )
-        import pdb; pdb.set_trace()
         output_ids = outputs.sequences[0, :-1]    # discard the last one
         thought = self.tokenizer.decode(output_ids, skip_special_tokens=True)
         past_key_values = outputs.past_key_values
@@ -329,12 +325,10 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         pred_mask = self.sam(image, pred_masks, text_embeds)[0]
-        import pdb; pdb.set_trace()
         bbox = self.mask2box(pred_mask > 0.0)
 
         # 3. crop the object from the image and answer the question
         image = image.crop(bbox)
-        import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
             input='<image_placeholder>' * 576 + 'This is the cropped image region of the object. ' + question)
         prompt = self.tokenizer.eos_token + prompt   # eos is to end the previous answer
@@ -355,7 +349,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
-        import pdb; pdb.set_trace()
         ## 3.1 pass the inputs first as the inputs_embeds conflict with past_key_values in generation
         outputs = self.deepseek_vl.language_model(
             inputs_embeds=inputs_embeds,
@@ -363,15 +356,13 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             return_dict=True,
             use_cache=True)
 
-        past_key_values = outputs.past_key_values   # updateed cache
         output_ids = outputs.logits[:, -1:].argmax(dim=-1)    # the first id of the answer
-        import pdb; pdb.set_trace()
         ## 3.2 generate final answer
         all_output_ids = [output_ids[0, 0].item()]
         while len(all_output_ids) < self.max_new_tokens:
             outputs = self.deepseek_vl.language_model(
                 input_ids=output_ids,
-                past_key_values=past_key_values,
+                past_key_values=outputs.past_key_values,
                 return_dict=True,
                 use_cache=True)
             output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
@@ -379,8 +370,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             if output_ids[0, 0] == self.tokenizer.eos_token_id:
                 break
             all_output_ids.append(output_ids[0, 0].item())
-            past_key_values = outputs.past_key_values  # updateed cache
 
+        # TODO: fix the bug in using generate function
         # output_ids = self.deepseek_vl.language_model.generate(
         #     input_ids=start_id,
         #     attention_mask=torch.ones(1, 1 + past_key_values[0][0].shape[2],
@@ -404,6 +395,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         assert self._generation_ready
         prompt = self.prompt_template['INSTRUCTION'].format(
             input='<image_placeholder>' * 576 + question + '<image_placeholder>')  # temporarily insert this special token to locate the question
+        import pdb; pdb.set_trace()
         input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
         image_places = torch.where(input_ids[0] == self.image_token_idx)[0]
         question_start_place = image_places[-2] + 1
@@ -459,6 +451,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         # 2. append the cropped image
         bbox = self.mask2box(pred_mask > 0.0)
+        import pdb; pdb.set_trace()
         image = image.crop(bbox)
 
         inserted_input_ids = self.tokenizer.encode(
@@ -468,6 +461,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         appended_input_ids = torch.cat(
             [inserted_input_ids, input_ids[:, question_end_place + 1:]], dim=1)
+        import pdb; pdb.set_trace()
 
         image_data = self.image_processor.preprocess(image)
         pixel_values = image_data['pixel_values'][0]
@@ -491,25 +485,23 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             return_dict=True,
             use_cache=True)
 
-        logits = outputs.logits
-        past_key_values = outputs.past_key_values   # updateed cache
-        start_id = logits[:, -1:].argmax(dim=-1)    # the first id of the answer
-
+        output_ids = outputs.logits[:, -1:].argmax(dim=-1)    # the first id of the answer
         ## 3.2 generate final answer
-        output_ids = self.deepseek_vl.language_model.generate(
-            input_ids=start_id,
-            attention_mask=torch.ones(1, 1+past_key_values[0][0].shape[2],
-                                      device=self.deepseek_vl.device,
-                                      dtype=torch.long),
-            past_key_values=past_key_values,
-            pad_token_id=self.tokenizer.eos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            max_new_tokens=self.max_new_tokens,
-            do_sample=False,
-            use_cache=True,
-        )[0]
+        all_output_ids = [output_ids[0, 0].item()]
+        import pdb; pdb.set_trace()
+        while len(all_output_ids) < self.max_new_tokens:
+            outputs = self.deepseek_vl.language_model(
+                input_ids=output_ids,
+                past_key_values=outputs.past_key_values,
+                return_dict=True,
+                use_cache=True)
+            output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
+            assert output_ids.shape[1] == 1
+            if output_ids[0, 0] == self.tokenizer.eos_token_id:
+                break
+            all_output_ids.append(output_ids[0, 0].item())
 
-        answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+        answer = self.tokenizer.decode(all_output_ids, skip_special_tokens=True)
 
         return '', bbox, answer
 
