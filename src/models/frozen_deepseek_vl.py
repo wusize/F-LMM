@@ -551,6 +551,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             attention_mask=torch.ones_like(input_ids),
             pad_token_id=self.tokenizer.eos_token_id,
             eos_token_id=self.tokenizer.eos_token_id,
+            stopping_criteria=self.stop_criteria,
             max_new_tokens=self.max_new_tokens,
             do_sample=False,
             use_cache=True,
