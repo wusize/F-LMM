@@ -290,7 +290,8 @@ if __name__ == '__main__':
     cfg = Config.fromfile('configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py')
     model = BUILDER.build(cfg.model)
     import pdb; pdb.set_trace()
-    model.load_state_dict(guess_load_checkpoint('checkpoints/frozen_deepseek_vl_1_3b_unet_sam_l_iter_95080.pth'))
+    _ = model.load_state_dict(guess_load_checkpoint('checkpoints/frozen_deepseek_vl_1_3b_unet_sam_l_iter_95080.pth'),
+                              strict=False)
     model._prepare_for_generation(image_processor=cfg.image_processor,
                                   prompt_template=cfg.prompt_template,
                                   max_thought_tokens=16,
