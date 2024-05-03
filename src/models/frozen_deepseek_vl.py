@@ -370,11 +370,12 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         all_output_ids = [output_ids[0, 0].item()]
         while len(all_output_ids) < self.max_new_tokens:
             outputs = self.deepseek_vl.language_model(
-                inputs_embeds=inputs_embeds,
+                input_ids=output_ids,
                 past_key_values=past_key_values,
                 return_dict=True,
                 use_cache=True)
-            output_ids = outputs.logits[:, -1:].argmax(dim=-1)  # the first id of the answer
+            output_ids = outputs.logits.argmax(dim=-1)  # the first id of the answer
+            assert output_ids.shape[1] == 1
             if output_ids[0, 0] == self.tokenizer.eos_token_id:
                 break
             all_output_ids.append(output_ids[0, 0].item())
