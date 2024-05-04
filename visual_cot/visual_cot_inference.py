@@ -82,6 +82,7 @@ if __name__ == '__main__':
                                     answer=answer,
                                     question_id=data_sample['question_id'],
                                     question=question,
+                                    image=data_sample['image'][0],
                                     gt=data_sample['conversations'][-1]['value']))
             results = gather_object(results)
         if accelerator.is_main_process:
