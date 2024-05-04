@@ -260,6 +260,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         assert self.with_memory, "For now we only support with_memory"
         self.box_scale = box_scale
         self.use_sam = use_sam
+        print_log(f"USE SAM? {use_sam}")
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question, *args, **kwargs):

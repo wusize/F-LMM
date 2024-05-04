@@ -50,6 +50,7 @@ if __name__ == '__main__':
     parser.add_argument('--version', default='v1', type=str)
     parser.add_argument('--save_folder', default='visual_cot', type=str)
     parser.add_argument('--debug', action='store_true')
+    parser.add_argument('--discard_sam', action='store_true')
     parser.add_argument('--box_scale', default=1.0, type=float)
     args = parser.parse_args()
     accelerator = Accelerator()
@@ -82,7 +83,8 @@ if __name__ == '__main__':
                                   max_new_tokens=32,
                                   lmm_name=cfg.lmm_name,
                                   additional_prompt='\nAnswer the question using a single word or phrase.',
-                                  box_scale=args.box_scale)
+                                  box_scale=args.box_scale,
+                                  use_sam=not args.discard_sam)
     model = model.to(device=accelerator.device)
     model.eval()
 
