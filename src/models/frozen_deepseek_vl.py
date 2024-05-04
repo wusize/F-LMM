@@ -232,6 +232,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                 additional_prompt=' Please briefly answer the question.',
                                 with_memory=True,
                                 box_scale=1.0,
+                                use_sam=True,
                                 **kwargs):
         from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
@@ -258,6 +259,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         self.with_memory = with_memory
         assert self.with_memory, "For now we only support with_memory"
         self.box_scale = box_scale
+        self.use_sam = use_sam
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question, *args, **kwargs):
@@ -336,7 +338,12 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
-        pred_mask = self.sam(image, pred_masks, text_embeds)[0]
+        pred_masks = F.interpolate(pred_masks[None].float(), size=(image.height, image.width),
+                                   mode='bilinear')[0].to(pred_masks)
+        if self.use_sam:
+            pred_mask = self.sam(image, pred_masks, text_embeds)[0]
+        else:
+            pred_mask = pred_masks[0]
         bbox = self.mask2box(pred_mask > 0.0)
 
         # 3. crop the object from the image and answer the question
@@ -416,7 +423,12 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
-        pred_mask = self.sam(image, pred_masks, text_embeds)[0]
+        pred_masks = F.interpolate(pred_masks[None].float(), size=(image.height, image.width),
+                                   mode='bilinear')[0].to(pred_masks)
+        if self.use_sam:
+            pred_mask = self.sam(image, pred_masks, text_embeds)[0]
+        else:
+            pred_mask = pred_masks[0]
 
         # 2. append the cropped image
         bbox = self.mask2box(pred_mask > 0.0)

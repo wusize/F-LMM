@@ -27,6 +27,7 @@ class DeepseekVLEval(lmms):
         batch_size: Optional[Union[int, str]] = 1,
         version: str = 'v1',
         with_memory=True,
+        use_sam=True,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -45,7 +46,9 @@ class DeepseekVLEval(lmms):
             max_new_tokens=512,
             lmm_name=cfg.lmm_name,
             additional_prompt='',
-            with_memory=with_memory)
+            with_memory=with_memory,
+            use_sam=use_sam,
+        )
         self._model.eval()
         self._config = self._model.deepseek_vl.config
         if accelerator.num_processes > 1:
