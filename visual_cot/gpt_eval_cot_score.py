@@ -20,35 +20,58 @@ model's answer: %s
 """
 
 API_KEY = os.environ['OPENAI_API_KEY']
+GPT_EVAL_MODEL_NAME = "gpt-4-0613"
+API_TYPE = os.getenv("API_TYPE", "openai")
+
+API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")
+# API_KEY = os.getenv("OPENAI_API_KEY", "YOUR_API_KEY")
+headers = {
+        "Authorization": f"Bearer {API_KEY}",
+        "Content-Type": "application/json",
+}
 
 
-def make_request_openai(content, extra_args={}):
-    headers = {}
-    headers['Content-Type']='application/json'
-    retry_times = 3
-    while retry_times > 0:
+def get_eval(content: str, max_tokens=100, retries: int = 5):
+    global headers
+    messages = [
+        {
+            "role": "system",
+            "content": BASE_PROMPT,
+        },
+        {"role": "user", "content": content},
+    ]
+
+    payload = {
+        "model": GPT_EVAL_MODEL_NAME,
+        "messages": messages,
+        "temperature": 0.2,
+        "max_tokens": max_tokens,
+    }
+
+    for attempt in range(retries):
         try:
-            data = {}
-            data['model']= "gpt-3.5-turbo-1106"
-            data['messages'] = [{"role":"system","content": BASE_PROMPT}, {"role": "user", "content":content}]
-            for key in extra_args:
-                data[key] = extra_args[key]
-            headers['Authorization'] = API_KEY
-            r = requests.post('https://api.openai.com/v1/chat/completions', headers=headers, json=data, timeout=60)
-            response = r.json()
-            response = response['choices'][0]['message']['content']
-            return response
+            response = requests.post(API_URL, headers=headers, json=payload, timeout=60)
+            response.raise_for_status()
+            response_data = response.json()
+
+            content = response_data["choices"][0]["message"]["content"]
+            if content != "":
+                return content
+            break  # If successful, break out of the loop
+
         except Exception as e:
-            print(e)
-            time.sleep(1)
-        finally:
-            retry_times -= 1
-    return 'unknown'
+            print(f"Attempt {attempt + 1} failed with error: {e}")
+            if attempt < retries:  # If we have retries left, sleep and then continue to next attempt
+                time.sleep(5)
+            else:  # If this was the last attempt, log and return empty
+                print(f"All {retries} attempts failed. Last error message: {e}")
+                return ""
+    return ""
 
 
 def get_score(question_text, gt_answer_text, pred_answer_text):
     content = PROMPT % (question_text, gt_answer_text, pred_answer_text)
-    ret = make_request_openai(content)
+    ret = get_eval(content)
     ret = ret.lower()
     if 'score' not in ret:
         return 0.0
@@ -65,6 +88,7 @@ def get_score(question_text, gt_answer_text, pred_answer_text):
 
 
 if __name__ == "__main__":
+    trial = get_eval('Who are you?')
     parser = argparse.ArgumentParser()
     parser.add_argument("--result_dir", type=str)
     args = parser.parse_args()
