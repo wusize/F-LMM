@@ -81,6 +81,7 @@ if __name__ == '__main__':
                                     box=box,
                                     answer=answer,
                                     question_id=data_sample['question_id'],
+                                    question=question,
                                     gt=data_sample['conversations'][-1]['value']))
             results = gather_object(results)
         if accelerator.is_main_process:
