@@ -127,7 +127,7 @@ class DeepseekVLEval(lmms):
             visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
             visuals = self.flatten(visuals)
             assert len(visuals) == 1, f"Currently only support 1 image: {contexts}, {visuals}"
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
             if 'max_new_tokens' in gen_kwargs:
                 self.model.max_new_tokens = gen_kwargs['max_new_tokens']
             text_output = getattr(self.model, f'visual_cot_{self.version}')(visuals[0], contexts)[-1]
