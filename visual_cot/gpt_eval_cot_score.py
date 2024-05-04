@@ -20,7 +20,7 @@ model's answer: %s
 """
 
 API_KEY = os.environ['OPENAI_API_KEY']
-GPT_EVAL_MODEL_NAME = "gpt-4-0613"
+GPT_EVAL_MODEL_NAME = "gpt-3.5-turbo-1106"
 API_TYPE = os.getenv("API_TYPE", "openai")
 
 API_URL = os.getenv("OPENAI_API_URL", "https://api.openai.com/v1/chat/completions")

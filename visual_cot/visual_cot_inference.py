@@ -99,7 +99,7 @@ if __name__ == '__main__':
             data_ids = data_ids[::100]
 
         results = []
-        ious = []
+        # ious = []
         with accelerator.split_between_processes(data_ids) as sub_ids:
             for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
                 data_sample = data[idx]
@@ -114,21 +114,21 @@ if __name__ == '__main__':
                 gt_bbox = [int(x) for x in gt_bbox.split(',')]
                 # import pdb; pdb.set_trace()
                 thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
-                iou = get_iou(box, gt_bbox)
-                ious.append(iou)
+                # iou = get_iou(box, gt_bbox)
+                # ious.append(iou)
                 results.append(dict(thought=thought,
                                     box=box,
                                     gt_bbox=gt_bbox,
-                                    iou=iou,
+                                    # iou=iou,
                                     answer=answer,
                                     question_id=data_sample['question_id'],
                                     question=question,
                                     image=data_sample['image'][0],
                                     gt=data_sample['conversations'][-1]['value']))
             results = gather_object(results)
-            ious = gather_object(ious)
+            # ious = gather_object(ious)
         if accelerator.is_main_process:
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
-            accelerator.print(f"Average IoU on {json_file}: {sum(ious) / len(ious)}")
+            # accelerator.print(f"Average IoU on {json_file}: {sum(ious) / len(ious)}")
             with open(os.path.join(args.save_folder, os.path.basename(json_file)), 'w') as f:
                 json.dump(results, f, indent=4)
