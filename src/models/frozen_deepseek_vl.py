@@ -229,6 +229,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                 max_thought_tokens,
                                 max_new_tokens,
                                 lmm_name='',
+                                additional_prompt=' Please briefly answer the question.',
                                 **kwargs):
         from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
@@ -251,6 +252,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             self.stop_criteria.append(
                 StopWordStoppingCriteria(self.tokenizer, word))
         self._generation_ready = True
+        self.additional_prompt = additional_prompt
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question):
@@ -341,7 +343,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 "role": "User",
                 "content": f"<image_placeholder>the whole image, "
                            f"<image_placeholder>the image region that might help you answer the question: "
-                           f"{question} Please brief answer the question.",
+                           f"{question}{self.additional_prompt}",
                 "images": ["image", "image",],
             },
             {"role": "Assistant", "content": ""}
@@ -419,7 +421,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 "role": "User",
                 "content": f"<image_placeholder>the whole image, "
                            f"<image_placeholder>the image region that might help you answer the question: "
-                           f"{question} Please brief answer the question.",
+                           f"{question}{self.additional_prompt}",
                 "images": ["image", "image",],
             },
             {"role": "Assistant", "content": ""}
@@ -453,8 +455,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         conversation = [
             {
                 "role": "User",
-                "content": f"<image_placeholder>{question} "
-                           f"Please brief answer the question.",
+                "content": f"<image_placeholder>{question}{self.additional_prompt}",
                 "images": ["image"],
             },
             {"role": "Assistant", "content": ""},
