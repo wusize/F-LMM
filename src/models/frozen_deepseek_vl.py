@@ -231,6 +231,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                 lmm_name='',
                                 additional_prompt=' Please briefly answer the question.',
                                 with_memory=True,
+                                box_scale=1.0,
                                 **kwargs):
         from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
@@ -256,6 +257,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         self.additional_prompt = additional_prompt
         self.with_memory = with_memory
         assert self.with_memory, "For now we only support with_memory"
+        self.box_scale = box_scale
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question, *args, **kwargs):
@@ -435,8 +437,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         else:
             return '', bbox, self.visual_cot_v3(image_crop, question)[-1]
 
-    @staticmethod
-    def mask2box(mask, scale=1.0):
+    def mask2box(self, mask):
+        scale = self.box_scale
         h, w = mask.shape
         assert mask.dtype == torch.bool
         ys, xs = torch.where(mask)
