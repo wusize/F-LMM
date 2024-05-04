@@ -47,8 +47,9 @@ if __name__ == '__main__':
     model._prepare_for_generation(image_processor=image_processor,
                                   prompt_template=prompt_template,
                                   max_thought_tokens=16,
-                                  max_new_tokens=512,
-                                  lmm_name=cfg.lmm_name)
+                                  max_new_tokens=32,
+                                  lmm_name=cfg.lmm_name,
+                                  additional_prompt='\nAnswer the question using a single word or phrase.')
     model = model.to(device=accelerator.device)
     model.eval()
 
