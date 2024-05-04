@@ -110,7 +110,7 @@ if __name__ == '__main__':
                 question = question.replace('<image>', '').strip()
                 gt_bbox = data_sample['image'][1].split('###')[-1].replace('[', '').replace(']', '')
                 gt_bbox = [int(x) for x in gt_bbox.split(',')]
-                import pdb; pdb.set_trace()
+                # import pdb; pdb.set_trace()
                 thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
                 iou = get_iou(box, gt_bbox)
                 ious.append(iou)
@@ -127,6 +127,6 @@ if __name__ == '__main__':
             ious = gather_object(ious)
         if accelerator.is_main_process:
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
-            accelerator.print(f"Average IoU: {sum(ious) / len(ious)}")
+            accelerator.print(f"Average IoU on {json_file}: {sum(ious) / len(ious)}")
             with open(os.path.join(args.save_folder, os.path.basename(json_file)), 'w') as f:
                 json.dump(results, f, indent=4)

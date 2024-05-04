@@ -255,6 +255,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         self._generation_ready = True
         self.additional_prompt = additional_prompt
         self.with_memory = with_memory
+        assert self.with_memory, "For now we only support with_memory"
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question, *args, **kwargs):
