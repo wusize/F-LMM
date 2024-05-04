@@ -90,4 +90,4 @@ if __name__ == '__main__':
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
 
             with open(os.path.join(args.save_folder, os.path.basename(json_file)), 'w') as f:
-                json.dump(results, f)
+                json.dump(results, f, indent=4)

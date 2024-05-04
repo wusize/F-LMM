@@ -352,7 +352,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             ]
             return thought, bbox, self.conversation(conversation, [image, image_crop])
         else:
-            return thought, bbox, self.visual_cot_v3(image_crop, question)
+            return thought, bbox, self.visual_cot_v3(image_crop, question)[-1]
 
     @torch.no_grad()
     def visual_cot_v2(self, image, question):
@@ -432,7 +432,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             ]
             return '', bbox, self.conversation(conversation, [image, image_crop])
         else:
-            return '', bbox, self.visual_cot_v3(image_crop, question)
+            return '', bbox, self.visual_cot_v3(image_crop, question)[-1]
 
     @staticmethod
     def mask2box(mask, scale=1.0):
