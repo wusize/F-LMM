@@ -230,6 +230,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                 max_new_tokens,
                                 lmm_name='',
                                 additional_prompt=' Please briefly answer the question.',
+                                with_memory=True,
                                 **kwargs):
         from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
@@ -253,6 +254,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 StopWordStoppingCriteria(self.tokenizer, word))
         self._generation_ready = True
         self.additional_prompt = additional_prompt
+        self.with_memory = with_memory
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question):
@@ -336,19 +338,21 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         # 3. crop the object from the image and answer the question
         image_crop = image.crop(bbox)
-
-        # multiple images (or in-context learning) conversation example
-        conversation = [
-            {
-                "role": "User",
-                "content": f"<image_placeholder>the whole image, "
-                           f"<image_placeholder>the image region that might help you answer the question: "
-                           f"{question}{self.additional_prompt}",
-                "images": ["image", "image",],
-            },
-            {"role": "Assistant", "content": ""}
-        ]
-        return thought, bbox, self.conversation(conversation, [image, image_crop])
+        if self.with_memory:
+            # multiple images (or in-context learning) conversation example
+            conversation = [
+                {
+                    "role": "User",
+                    "content": f"<image_placeholder>the whole image, "
+                               f"<image_placeholder>the image region that might help you answer the question: "
+                               f"{question}{self.additional_prompt}",
+                    "images": ["image", "image",],
+                },
+                {"role": "Assistant", "content": ""}
+            ]
+            return thought, bbox, self.conversation(conversation, [image, image_crop])
+        else:
+            return thought, bbox, self.visual_cot_v3(image_crop, question)
 
     @torch.no_grad()
     def visual_cot_v2(self, image, question):
@@ -414,19 +418,21 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         # 2. append the cropped image
         bbox = self.mask2box(pred_mask > 0.0)
         image_crop = image.crop(bbox)
-
-        # multiple images (or in-context learning) conversation example
-        conversation = [
-            {
-                "role": "User",
-                "content": f"<image_placeholder>the whole image, "
-                           f"<image_placeholder>the image region that might help you answer the question: "
-                           f"{question}{self.additional_prompt}",
-                "images": ["image", "image",],
-            },
-            {"role": "Assistant", "content": ""}
-        ]
-        return '', bbox, self.conversation(conversation, [image, image_crop])
+        if self.with_memory:
+            # multiple images (or in-context learning) conversation example
+            conversation = [
+                {
+                    "role": "User",
+                    "content": f"<image_placeholder>the whole image, "
+                               f"<image_placeholder>the image region that might help you answer the question: "
+                               f"{question}{self.additional_prompt}",
+                    "images": ["image", "image",],
+                },
+                {"role": "Assistant", "content": ""}
+            ]
+            return '', bbox, self.conversation(conversation, [image, image_crop])
+        else:
+            return '', bbox, self.visual_cot_v3(image_crop, question)
 
     @staticmethod
     def mask2box(mask, scale=1.0):

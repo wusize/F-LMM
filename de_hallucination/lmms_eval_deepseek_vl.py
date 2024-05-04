@@ -26,6 +26,7 @@ class DeepseekVLEval(lmms):
         device: Optional[str] = "cuda",
         batch_size: Optional[Union[int, str]] = 1,
         version: str = 'v1',
+        with_memory=True,
         **kwargs,
     ) -> None:
         super().__init__()
@@ -43,7 +44,8 @@ class DeepseekVLEval(lmms):
             max_thought_tokens=16,
             max_new_tokens=512,
             lmm_name=cfg.lmm_name,
-            additional_prompt='')
+            additional_prompt='',
+            with_memory=with_memory)
         self._model.eval()
         self._config = self._model.deepseek_vl.config
         if accelerator.num_processes > 1:
