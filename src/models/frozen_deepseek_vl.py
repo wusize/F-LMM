@@ -257,7 +257,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         self.with_memory = with_memory
 
     @torch.no_grad()
-    def visual_cot_v1(self, image, question):
+    def visual_cot_v1(self, image, question, *args, **kwargs):
         # v1: let the llm first describe the most relevant object
         assert self._generation_ready
         # 1. Round one: prompt the llm to find the most relevant object
@@ -355,7 +355,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             return thought, bbox, self.visual_cot_v3(image_crop, question)[-1]
 
     @torch.no_grad()
-    def visual_cot_v2(self, image, question):
+    def visual_cot_v2(self, image, question, *args, **kwargs):
         # v2: dirrecly ground the whole question
         assert self._generation_ready
         prompt = self.prompt_template['INSTRUCTION'].format(
@@ -454,7 +454,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             return int(x0), int(y0), int(x1), int(y1)
 
     @torch.no_grad()
-    def visual_cot_v3(self, image, question):
+    def visual_cot_v3(self, image, question, *args, **kwargs):
         # v3: the baseline, no cot
         assert self._generation_ready
         # single image conversation example
@@ -467,6 +467,22 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             {"role": "Assistant", "content": ""},
         ]
         return '', (0, 0, image.width, image.height), self.conversation(conversation, [image])
+
+    @torch.no_grad()
+    def visual_cot_v4(self, image, question, bbox, **kwargs):
+        image_crop = image.crop(bbox)
+        assert self.with_memory
+        conversation = [
+            {
+                "role": "User",
+                "content": f"<image_placeholder>the whole image, "
+                           f"<image_placeholder>the image region that might help you answer the question: "
+                           f"{question}{self.additional_prompt}",
+                "images": ["image", "image",],
+            },
+            {"role": "Assistant", "content": ""}
+        ]
+        return '', bbox, self.conversation(conversation, [image, image_crop])
 
     def conversation(self, conversation, images):
         # prepare for inputs

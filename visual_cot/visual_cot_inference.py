@@ -10,6 +10,37 @@ from xtuner.registry import BUILDER
 from PIL import Image
 from xtuner.model.utils import guess_load_checkpoint
 
+def get_iou(bb1, bb2):
+    assert bb1[0] < bb1[2]
+    assert bb1[1] < bb1[3]
+    assert bb2[0] < bb2[2]
+    assert bb2[1] < bb2[3]
+
+    # determine the coordinates of the intersection rectangle
+    x_left = max(bb1[0], bb2[0])
+    y_top = max(bb1[1], bb2[1])
+    x_right = min(bb1[2], bb2[2])
+    y_bottom = min(bb1[3], bb2[3])
+
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+
+    # The intersection of two axis-aligned bounding boxes is always an
+    # axis-aligned bounding box
+    intersection_area = (x_right - x_left) * (y_bottom - y_top)
+
+    # compute the area of both AABBs
+    bb1_area = (bb1[2] - bb1[0]) * (bb1[3] - bb1[1])
+    bb2_area = (bb2[2] - bb2[0]) * (bb2[3] - bb2[1])
+
+    # compute the intersection over union by taking the intersection
+    # area and dividing it by the sum of prediction + ground-truth
+    # areas - the interesection area
+    iou = intersection_area / float(bb1_area + bb2_area - intersection_area)
+    assert iou >= 0.0
+    assert iou <= 1.0
+    return iou
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
@@ -66,6 +97,7 @@ if __name__ == '__main__':
             data_ids = data_ids[::100]
 
         results = []
+        ious = []
         with accelerator.split_between_processes(data_ids) as sub_ids:
             for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
                 data_sample = data[idx]
@@ -76,18 +108,25 @@ if __name__ == '__main__':
                     ''
                 )
                 question = question.replace('<image>', '').strip()
-
-                thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question)
+                gt_bbox = data_sample['image'][1].split('###')[-1].replace('[', '').replace(']', '')
+                gt_bbox = [int(x) for x in gt_bbox.split(',')]
+                import pdb; pdb.set_trace()
+                thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
+                iou = get_iou(box, gt_bbox)
+                ious.append(iou)
                 results.append(dict(thought=thought,
                                     box=box,
+                                    gt_bbox=gt_bbox,
+                                    iou=iou,
                                     answer=answer,
                                     question_id=data_sample['question_id'],
                                     question=question,
                                     image=data_sample['image'][0],
                                     gt=data_sample['conversations'][-1]['value']))
             results = gather_object(results)
+            ious = gather_object(ious)
         if accelerator.is_main_process:
             accelerator.print(f"Collected {len(results)} result samples from all gpus")
-
+            accelerator.print(f"Average IoU: {sum(ious) / len(ious)}")
             with open(os.path.join(args.save_folder, os.path.basename(json_file)), 'w') as f:
                 json.dump(results, f, indent=4)
