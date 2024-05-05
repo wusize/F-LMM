@@ -22,7 +22,7 @@ def get_eval(content: str, max_tokens=100, retries: int = 5):
     kwargs = {
         "temperature": 0.2,
         "stream": False,
-        "max_new_tokens": max_tokens
+        # "max_new_tokens": max_tokens
     }
 
     for attempt in range(retries):
@@ -55,7 +55,7 @@ def get_score(question_text, gt_answer_text, pred_answer_text):
         res = 1
     if res < 0.0:
         res = 0
-    time.sleep(1)    # sleep for 1 second after a successful request to avoid high frequency
+    # time.sleep(1)    # sleep for 1 second after a successful request to avoid high frequency
     return res
 
 
