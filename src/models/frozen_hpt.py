@@ -7,7 +7,7 @@ from xtuner.model.utils import LoadWoInit
 from mmengine.logging import print_log
 from xtuner.model.llava import prepare_inputs_labels_for_multimodal
 from xtuner.utils.constants import IMAGE_TOKEN_INDEX, IGNORE_INDEX
-
+from src.models.siglip.modeling_siglip import SiglipVisionModel
 
 @torch.no_grad()
 def compute_mask_IoU(masks, target):
@@ -45,7 +45,6 @@ class FrozenHPT(BaseModel):
 
     @staticmethod
     def interpolate_pos_embed(model, new_size):
-        import pdb; pdb.set_trace()
         pos_emb = model.vision_model.embeddings.position_embedding.weight.float()
         ori_size = int((pos_emb.shape[0] - 1) ** 0.5)
         dim = pos_emb.shape[1]
@@ -60,21 +59,47 @@ class FrozenHPT(BaseModel):
         new_pos_embed = new_pos_embed.to(torch.float16)
         return torch.nn.Parameter(new_pos_embed)
 
+    @staticmethod
+    def interpolate_pos_embed_siglip(model, new_size):
+        pos_emb = model.vision_model.embeddings.position_embedding.weight.float()
+        ori_size = int((pos_emb.shape[0]) ** 0.5)
+        dim = pos_emb.shape[1]
+        print_log("Position interpolate from %dx%d to %dx%d" % (ori_size, ori_size, new_size, new_size))
+        pos_tokens = pos_emb
+        pos_tokens = pos_tokens.reshape(-1, ori_size, ori_size, dim).permute(0, 3, 1, 2)
+        pos_tokens = torch.nn.functional.interpolate(
+            pos_tokens, size=(new_size, new_size), mode='bicubic', align_corners=False)
+        pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2).squeeze(0)
+        new_pos_embed = pos_tokens  # torch.cat((extra_tokens, pos_tokens), dim=0)
+        new_pos_embed = new_pos_embed.to(torch.float16)
+        return torch.nn.Parameter(new_pos_embed)
+
     def _init_models(self, llm, visual_encoder, projector):
         with LoadWoInit():
             llm = BUILDER.build(llm)
             visual_encoder = BUILDER.build(visual_encoder)
             projector = BUILDER.build(projector)
-        import pdb; pdb.set_trace()
-        patch_size = visual_encoder.vision_model.embeddings.patch_size
-        num_positions = (self.image_size // patch_size) ** 2 + 1
-        new_size = self.image_size // patch_size
-        visual_encoder.vision_model.embeddings.num_patches = (self.image_size // patch_size) ** 2
-        visual_encoder.vision_model.embeddings.num_positions = num_positions
-        visual_encoder.vision_model.embeddings.position_ids = torch.arange(num_positions).expand((1, -1))
-        visual_encoder.vision_model.embeddings.position_embedding.weight = self.interpolate_pos_embed(
-            visual_encoder, new_size)
-        visual_encoder.config.image_size = self.image_size
+        if isinstance(visual_encoder, SiglipVisionModel):
+            patch_size = visual_encoder.vision_model.embeddings.patch_size
+            num_positions = (self.image_size // patch_size) ** 2
+            new_size = self.image_size // patch_size
+            visual_encoder.vision_model.embeddings.num_patches = (self.image_size // patch_size) ** 2
+            visual_encoder.vision_model.embeddings.num_positions = num_positions
+            visual_encoder.vision_model.embeddings.position_ids = torch.arange(num_positions).expand((1, -1))
+            visual_encoder.vision_model.embeddings.position_embedding.weight = self.interpolate_pos_embed_siglip(
+                visual_encoder, new_size)
+            visual_encoder.config.image_size = self.image_size
+        else:
+            patch_size = visual_encoder.vision_model.embeddings.patch_size
+            num_positions = (self.image_size // patch_size) ** 2 + 1
+            new_size = self.image_size // patch_size
+            visual_encoder.vision_model.embeddings.num_patches = (self.image_size // patch_size) ** 2
+            visual_encoder.vision_model.embeddings.num_positions = num_positions
+            visual_encoder.vision_model.embeddings.position_ids = torch.arange(num_positions).expand((1, -1))
+            visual_encoder.vision_model.embeddings.position_embedding.weight = self.interpolate_pos_embed(
+                visual_encoder, new_size)
+            visual_encoder.config.image_size = self.image_size
+
         self.clip_shape = new_size
         self.llm = llm
         self.visual_encoder = visual_encoder.to(llm.dtype)
