@@ -45,6 +45,7 @@ class FrozenHPT(BaseModel):
 
     @staticmethod
     def interpolate_pos_embed(model, new_size):
+        import pdb; pdb.set_trace()
         pos_emb = model.vision_model.embeddings.position_embedding.weight.float()
         ori_size = int((pos_emb.shape[0] - 1) ** 0.5)
         dim = pos_emb.shape[1]
