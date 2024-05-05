@@ -107,6 +107,7 @@ class FrozenHPT(BaseModel):
         self.llm.requires_grad_(False)
         self.visual_encoder.requires_grad_(False)
         self.projector.requires_grad_(False)
+        self.num_patches = visual_encoder.vision_model.embeddings.num_patches
 
     def apply_merge(self, x, dim=1):
         if self.merge == 'mean':
@@ -172,9 +173,8 @@ class FrozenHPTSAM(FrozenHPT):
             pixel_values = data_sample['pixel_values'][None].to(device=self.visual_encoder.device,
                                                                 dtype=self.visual_encoder.dtype)
             visual_outputs = self.visual_encoder(pixel_values, output_hidden_states=True)
-            import pdb; pdb.set_trace()
             pixel_values = self.projector(
-                visual_outputs.hidden_states[self.visual_select_layer][:, 1:].to(self.projector.dtype)
+                visual_outputs.hidden_states[self.visual_select_layer][:, -self.num_patches:].to(self.projector.dtype)
             ).to(self.llm.dtype)
 
         input_ids = data_sample['input_ids'][None].to(self.llm.device)
