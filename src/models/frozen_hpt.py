@@ -64,6 +64,7 @@ class FrozenHPT(BaseModel):
             llm = BUILDER.build(llm)
             visual_encoder = BUILDER.build(visual_encoder)
             projector = BUILDER.build(projector)
+        import pdb; pdb.set_trace()
         patch_size = visual_encoder.vision_model.embeddings.patch_size
         num_positions = (self.image_size // patch_size) ** 2 + 1
         new_size = self.image_size // patch_size
