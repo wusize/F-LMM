@@ -105,7 +105,7 @@ def call_openai_completion_api(messages, model="gpt-4", **kwargs):
         for content in msg["content"]:
             if isinstance(content, dict) and content.get("image_url"):
                 content["image_url"] = "data:image/jpeg;base64, ..."
-    print(messages_for_log)
+    # print(messages_for_log)
 
     if version.parse(pkg_resources.get_distribution("openai").version) < version.parse("1"):
         # 暂不维护openai<1.0
@@ -129,9 +129,9 @@ def call_openai_completion_api(messages, model="gpt-4", **kwargs):
             collected_messages.append(chunk_message)  # save the message
             # print(chunk_message.get('content', ''))
         full_reply_content = "".join([m.get("content", "") for m in collected_messages])
-        print(full_reply_content)
+        # print(full_reply_content)
         return full_reply_content
-    print(response)
+    # print(response)
     prompt_tokens = response.usage.prompt_tokens
     completion_tokens = response.usage.completion_tokens
     # gpt4-turbo cost
