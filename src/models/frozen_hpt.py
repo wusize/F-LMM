@@ -172,6 +172,7 @@ class FrozenHPTSAM(FrozenHPT):
             pixel_values = data_sample['pixel_values'][None].to(device=self.visual_encoder.device,
                                                                 dtype=self.visual_encoder.dtype)
             visual_outputs = self.visual_encoder(pixel_values, output_hidden_states=True)
+            import pdb; pdb.set_trace()
             pixel_values = self.projector(
                 visual_outputs.hidden_states[self.visual_select_layer][:, 1:].to(self.projector.dtype)
             ).to(self.llm.dtype)
