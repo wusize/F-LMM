@@ -486,7 +486,10 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
     @torch.no_grad()
     def visual_cot_v4(self, image, question, bbox, **kwargs):
-        image_crop = image.crop(bbox)
+        try:
+            image_crop = image.crop(bbox)
+        except:
+            return self.visual_cot_v3(image, question,)
         assert self.with_memory
         conversation = [
             {
