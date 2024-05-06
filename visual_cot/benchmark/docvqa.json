@@ -3461,7 +3461,7 @@
         "question_id": 128,
         "image": [
             "cot/docvqa/nrxb0228_3.png",
-            "cot/docvqa/nrxb0228_3.png###[868, 213, 859, 389]"
+            "cot/docvqa/nrxb0228_3.png###[800, 213, 900, 389]"
         ],
         "conversations": [
             {
@@ -3470,7 +3470,7 @@
             },
             {
                 "from": "gpt",
-                "value": "[0.685, 0.344, 0.678, 0.483]"
+                "value": "[0.631, 0.344, 0.710, 0.483]"
             },
             {
                 "from": "human",
