@@ -76,6 +76,10 @@ class FCNHead(nn.Module):
         x = self.conv_seg(x)
         return x
 
+    @property
+    def dtype(self):
+        return self.conv_seg.weight.dtype
+
 
 def upsample_forward_func(self, x):
     dtype = x.dtype
