@@ -17,9 +17,6 @@ class FCNHead(nn.Module):
     Args:
         num_convs (int): Number of convs in the head. Default: 2.
         kernel_size (int): The kernel size for convs in the head. Default: 3.
-        concat_input (bool): Whether concat the input and output of convs
-            before classification layer.
-        dilation (int): The dilation rate for convs in the head. Default: 1.
     """
 
     def __init__(self,
@@ -27,21 +24,18 @@ class FCNHead(nn.Module):
                  kernel_size=3,
                  in_channels=2048,
                  channels=256,
-                 concat_input=True,
-                 dilation=1,
                  conv_cfg=None,
                  norm_cfg=None,
-                 act_cfg=None):
-        assert num_convs >= 0 and dilation > 0 and isinstance(dilation, int)
+                 upsample_input=None,
+                 normalize_input=False,):
         self.num_convs = num_convs
-        self.concat_input = concat_input
         self.kernel_size = kernel_size
         super().__init__()
         assert num_convs > 0
         self.in_channels = in_channels
         self.channels = channels
 
-        conv_padding = (kernel_size // 2) * dilation
+        conv_padding = kernel_size // 2
         convs = []
         convs.append(
             ConvModule(
@@ -49,10 +43,9 @@ class FCNHead(nn.Module):
                 self.channels,
                 kernel_size=kernel_size,
                 padding=conv_padding,
-                dilation=dilation,
                 conv_cfg=conv_cfg,
-                norm_cfg=norm_cfg,
-                act_cfg=act_cfg))
+                norm_cfg=norm_cfg)
+        )
         for i in range(num_convs - 1):
             convs.append(
                 ConvModule(
@@ -60,15 +53,25 @@ class FCNHead(nn.Module):
                     self.channels,
                     kernel_size=kernel_size,
                     padding=conv_padding,
-                    dilation=dilation,
                     conv_cfg=conv_cfg,
                     norm_cfg=norm_cfg,
-                    act_cfg=act_cfg))
+                )
+            )
         self.convs = nn.Sequential(*convs)
         self.conv_seg = nn.Conv2d(self.channels, 1, kernel_size=1)
+        self.upsample_input = upsample_input
+        self.normalize_input = normalize_input
 
     def forward(self, x):
         """Forward function."""
+        if self.normalize_input:
+            assert x.min() >= 0.0 and x.max() <= 1.0
+            x_sum = x.sum((-2, -1), keepdims=True).clamp(min=1e-12)
+            x = x / x_sum
+        if self.upsample_input is not None:
+            h, w = x.shape[-2:]
+            scale_factor = max(1.0, self.upsample_input / max(h, w))
+            x = F.interpolate(x.float(), scale_factor=scale_factor, mode='bilinear').to(x)
         x = self.convs(x)
         x = self.conv_seg(x)
         return x
@@ -160,15 +163,28 @@ class SingleConvHead(nn.Module):
 
 if __name__ == '__main__':
     from mmseg.models.backbones.unet import InterpConv
-    unet = UNetHead(in_channels=2048,
+    from torch.nn.modules.normalization import GroupNorm
+    unet = UNetHead(normalize_input=True,
+                    upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
+                    in_channels=2048,
                     base_channels=64,
-                    num_stages=3,
-                    strides=(1, 1, 1),
-                    enc_num_convs=(2, 2, 2),  # the first enc is for projection
-                    dec_num_convs=(2, 2),
-                    downsamples=(True, True),
-                    enc_dilations=(1, 1, 1),
-                    dec_dilations=(1, 1),
-                    upsample_cfg=dict(type=InterpConv))
+                    num_stages=4,strides=(1, 1, 1, 1),
+                    enc_num_convs=(2, 2, 2, 2),   # the first enc is for projection
+                    dec_num_convs=(2, 2, 2),
+                    downsamples=(True, True, True),
+                    enc_dilations=(1, 1, 1, 1),
+                    dec_dilations=(1, 1, 1),
+                    norm_cfg=dict(type=GroupNorm, num_groups=1),
+                    upsample_cfg=dict(type=InterpConv)
+                    )
 
-    torch.save(unet.state_dict(), 'data/unet_example.pth')
+    torch.save(unet.state_dict(), 'data/unet.pth')
+
+    fcn = FCNHead(normalize_input=True,
+                  upsample_input=64,
+                  num_convs=8,
+                  kernel_size=3,
+                  in_channels=2048,
+                  norm_cfg=dict(type=GroupNorm, num_groups=1),
+                  channels=256)
+    torch.save(fcn.state_dict(), 'data/fcn.pth')
