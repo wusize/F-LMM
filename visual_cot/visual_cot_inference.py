@@ -115,7 +115,7 @@ if __name__ == '__main__':
         accelerator.wait_for_everyone()
         data_ids = list(range(len(data)))
         if args.debug:
-            data_ids = data_ids[::100]
+            data_ids = data_ids[::50]
 
         results = []
         # ious = []
