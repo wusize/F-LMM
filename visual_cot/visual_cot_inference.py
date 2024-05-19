@@ -45,6 +45,7 @@ def get_iou(bb1, bb2):
 
 
 def draw_box(image, box):
+    import pdb; pdb.set_trace()
     image = np.array(image)
     image = mmcv.imshow_bboxes(img=image,
                                bboxes=[box],
@@ -136,6 +137,7 @@ if __name__ == '__main__':
                 thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
                 # iou = get_iou(box, gt_bbox)
                 # ious.append(iou)
+                import pdb; pdb.set_trace()
                 image = draw_box(image, box)
                 image.save(os.path.join(args.save_folder,
                                         f"{os.path.basename(json_file)[:-4]}/{os.path.basename(data_sample['image'][0])}"))
