@@ -27,6 +27,7 @@ if __name__ == '__main__':
 
     with open(args.json_path, 'r') as f:
         data = json.load(f)
+    os.makedirs(args.save_path, exist_ok=True)
 
     for data_sample in tqdm(data):
         image = Image.open(data_sample['image']).convert('RGB')
