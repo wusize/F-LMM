@@ -150,6 +150,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
 
         pred_masks = self.mask_head(mask_attentions)[:, 0]
+        with torch.no_grad():
+            mask_attentions = F.interpolate(mask_attentions.float(), size=pred_masks.shape[-2:],
+                                            mode='bilinear').to(self.mask_head.dtype)
         # todo: unpad pred_masks
         padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
         padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
@@ -160,6 +163,10 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+
+        mask_attentions \
+            = mask_attentions[..., before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
 
         output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks,
@@ -605,9 +612,10 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         sam_pred_masks = self.sam(image, pred_masks, text_embeds)
-        output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks)
+        pred_masks = F.interpolate(pred_masks[None].float(), size=(image.height, image.width), mode='bilinear')[0]
+        # output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks)
 
-        return output
+        return pred_masks, sam_pred_masks
 
 
 if __name__ == '__main__':
