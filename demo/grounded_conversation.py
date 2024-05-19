@@ -123,6 +123,6 @@ if __name__ == '__main__':
         image_np[mask] = image_np[mask] * 0.2 + np.array(colors[color_id]).reshape((1, 1, 3)) * 0.8
 
     image = Image.fromarray(image_np.astype(np.uint8))
-    print(output_text)
-    print(phrases)
+    print(output_text, flush=True)
+    print(phrases, flush=True)
     image.save('example.jpg')
