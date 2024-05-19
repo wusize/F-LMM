@@ -34,38 +34,39 @@ vl_gpt: MultiModalityCausalLM = AutoModelForCausalLM.from_pretrained(
 vl_gpt = vl_gpt.to(torch.bfloat16).cuda().eval()
 
 # single image conversation example
-# conversation = [
-#     {
-#         "role": "User",
-#         "content": "<image_placeholder>Describe each stage of this image.",
-#         "images": ["./images/training_pipelines.jpg"],
-#     },
-#     {"role": "Assistant", "content": ""},
-# ]
-
-# multiple images (or in-context learning) conversation example
 conversation = [
     {
         "role": "User",
-        "content": "<image_placeholder>A dog wearing nothing in the foreground, "
-                   "<image_placeholder>a dog wearing a santa hat, "
-                   "<image_placeholder>a dog wearing a wizard outfit, and "
-                   "<image_placeholder>what's the dog wearing?",
-        "images": [
-            "images/dog_a.png",
-            "images/dog_b.png",
-            "images/dog_c.png",
-            "images/dog_d.png",
-        ],
+        "content": "<image_placeholder>Briefly describe this image.",
+        "images": ["data/coco/val2017/000000000139.jpg"],
     },
-    {"role": "Assistant", "content": ""}
+    {"role": "Assistant", "content": ""},
 ]
+
+# multiple images (or in-context learning) conversation example
+# conversation = [
+#     {
+#         "role": "User",
+#         "content": "<image_placeholder>A dog wearing nothing in the foreground, "
+#                    "<image_placeholder>a dog wearing a santa hat, "
+#                    "<image_placeholder>a dog wearing a wizard outfit, and "
+#                    "<image_placeholder>what's the dog wearing?",
+#         "images": [
+#             "images/dog_a.png",
+#             "images/dog_b.png",
+#             "images/dog_c.png",
+#             "images/dog_d.png",
+#         ],
+#     },
+#     {"role": "Assistant", "content": ""}
+# ]
 
 # load images and prepare for inputs
 pil_images = load_pil_images(conversation)
-prepare_inputs = vl_chat_processor(
+prepare_inputs, meta_datas = vl_chat_processor(
     conversations=conversation, images=pil_images, force_batchify=True
-).to(vl_gpt.device)
+)
+prepare_inputs = prepare_inputs.to(vl_gpt.device)
 
 # run image encoder to get the image embeddings
 inputs_embeds = vl_gpt.prepare_inputs_embeds(**prepare_inputs)
@@ -80,7 +81,11 @@ outputs = vl_gpt.language_model.generate(
     max_new_tokens=512,
     do_sample=False,
     use_cache=True,
+    output_attentions=True,
+    output_hidden_states=True,
+    return_dict_in_generate=True,
 )
-
-answer = tokenizer.decode(outputs[0].cpu().tolist(), skip_special_tokens=True)
+num_layers = vl_gpt.config.language_config.num_hidden_layers
+output_ids = outputs.sequences[0].cpu().tolist()
+answer = tokenizer.decode(output_ids, skip_special_tokens=False)
 print(f"{prepare_inputs['sft_format'][0]}", answer)

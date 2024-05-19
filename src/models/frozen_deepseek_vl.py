@@ -510,7 +510,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         # prepare for inputs
         prepare_inputs = self.vl_chat_processor(
             conversations=conversation, images=images, force_batchify=True
-        ).to(self.deepseek_vl.device)
+        )[0].to(self.deepseek_vl.device)
 
         # run image encoder to get the image embeddings
         inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(**prepare_inputs)
@@ -527,6 +527,86 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         )
         answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
         return answer
+
+    @torch.no_grad()
+    def single_turn(self, image, question, *args, **kwargs):
+        assert self._generation_ready
+        conversation = [
+            {
+                "role": "User",
+                "content": f"<image_placeholder>{question}",
+                "images": ["image"],
+            },
+            {"role": "Assistant", "content": ""},
+        ]
+        # prepare for inputs
+        prepare_inputs, meta_datas = self.vl_chat_processor(
+            conversations=conversation, images=[image], force_batchify=True
+        )
+        prepare_inputs = prepare_inputs.to(self.deepseek_vl.device)
+        # run image encoder to get the image embeddings
+        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(**prepare_inputs)
+
+        # run the model to get the response
+        outputs = self.deepseek_vl.language_model.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=prepare_inputs.attention_mask,
+            pad_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=self.max_new_tokens,
+            do_sample=False,
+            use_cache=True,
+            output_attentions=True,
+            output_hidden_states=True,
+            return_dict_in_generate=True,
+        )
+        ## collect attentions and embeddings
+        num_layers = self.deepseek_vl.config.language_config.num_hidden_layers
+        num_heads = self.deepseek_vl.config.language_config.num_attention_heads
+        # collect attentions
+        images_seq_mask = prepare_inputs.images_seq_mask[0]
+        attention_maps = torch.cat([torch.cat([attns[layer_id][0, ..., torch.where(images_seq_mask)[0]]
+                                               for attns in outputs.attentions[1:]], dim=-2)
+                                    for layer_id in range(num_layers)], dim=0).view(num_layers*num_heads, -1,
+                                                                                    self.clip_shape, self.clip_shape)
+        # collect embeddings
+        text_layer_weights = self.get_text_layer_weights()
+        hidden_states = torch.stack([
+            torch.cat([hs[layer_id+1][0] for hs in outputs.hidden_states[1:]], dim=0)
+            for layer_id in range(num_layers)], dim=0)  # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
+        output_ids = outputs.sequences[0, :-1]   # discard the last one
+        output_text = self.tokenizer.decode(output_ids, skip_special_tokens=False)
+
+        return dict(output_ids=output_ids, output_text=output_text, hidden_states=hidden_states,
+                    attention_maps=attention_maps, meta_data=meta_datas[0])
+
+    def ground(self, image, positive_ids, hidden_states, attention_maps, meta_data, **kwargs):
+        mask_attentions = []
+        text_embeds = []
+        for start_id, end_id in positive_ids:
+            assert end_id > start_id
+            mask_attentions.append(
+                self.apply_merge(attention_maps[:, start_id:end_id], dim=1)
+            )
+            text_embeds.append(self.text_proj(hidden_states[start_id:end_id]))
+        mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
+        pred_masks = self.mask_head(mask_attentions)[:, 0]
+        # todo: unpad pred_masks
+        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
+        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
+        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
+
+        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
+        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
+        pred_masks \
+            = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+        sam_pred_masks = self.sam(image, pred_masks, text_embeds)
+        output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks)
+
+        return output
 
 
 if __name__ == '__main__':

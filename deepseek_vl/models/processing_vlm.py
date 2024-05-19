@@ -289,7 +289,7 @@ class VLChatProcessor(ProcessorMixin):
             num_image_tokens=num_image_tokens,
         )
 
-        return prepare
+        return prepare, images_outputs.meta_datas
 
     def __call__(
         self,
@@ -317,14 +317,14 @@ class VLChatProcessor(ProcessorMixin):
                 - num_image_tokens (List[int]): the number of image tokens
         """
 
-        prepare = self.process_one(
+        prepare, meta_datas = self.process_one(
             prompt=prompt, conversations=conversations, images=images
         )
 
         if force_batchify:
             prepare = self.batchify([prepare])
 
-        return prepare
+        return prepare, meta_datas
 
     def batchify(
         self, prepare_list: List[VLChatProcessorOutput]
