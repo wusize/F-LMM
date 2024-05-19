@@ -226,13 +226,14 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
     def _prepare_for_generation(self,
                                 image_processor,
                                 prompt_template,
-                                max_thought_tokens,
-                                max_new_tokens,
+                                max_thought_tokens=16,
+                                max_new_tokens=512,
                                 lmm_name='',
                                 additional_prompt=' Please briefly answer the question.',
                                 with_memory=True,
                                 box_scale=1.0,
                                 use_sam=True,
+                                kmeans=False,
                                 **kwargs):
         from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
@@ -260,7 +261,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         assert self.with_memory, "For now we only support with_memory"
         self.box_scale = box_scale
         self.use_sam = use_sam
+        self.kmeans = kmeans
         print_log(f"USE SAM? {use_sam}")
+        print_log(f"KMeans? {kmeans}")
 
     @torch.no_grad()
     def visual_cot_v1(self, image, question, *args, **kwargs):
