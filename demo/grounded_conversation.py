@@ -48,7 +48,8 @@ def extract_noun_phrases(output_text):
     noun_chunks = process_noun_chunks(noun_chunks)
     noun_chunks = sorted(noun_chunks, key=lambda x: output_text.find(x))
 
-    noun_chunks = [noun_chunk for noun_chunk in noun_chunks if input(f'Ground {noun_chunk}?') == 1]
+    noun_chunks = [noun_chunk for noun_chunk in noun_chunks
+                   if int(input(f'Ground {noun_chunk}?')) == 1]
 
     positive_ids = []
     phrases = []
