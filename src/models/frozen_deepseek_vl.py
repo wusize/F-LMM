@@ -163,7 +163,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         sam_pred_masks = self.sam(data_sample['image'], pred_masks, text_embeds)
 
         output = dict(pred_masks=pred_masks, sam_pred_masks=sam_pred_masks,
-                      mask_ids=mask_ids, hidden_states=hidden_states)
+                      mask_ids=mask_ids, hidden_states=hidden_states,
+                      mask_attentions=mask_attentions)
 
         return output
 
