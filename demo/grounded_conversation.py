@@ -14,7 +14,8 @@ from demo.utils import colors
 
 import spacy
 nlp = spacy.load("en_core_web_sm")
-
+import random
+random.shuffle(colors)
 
 
 def process_noun_chunks(noun_chunks):
