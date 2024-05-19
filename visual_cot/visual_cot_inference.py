@@ -138,7 +138,7 @@ if __name__ == '__main__':
                 # ious.append(iou)
                 image = draw_box(image, box)
                 image.save(os.path.join(args.save_folder,
-                                        f'{os.path.basename(json_file)[:-4]}/{os.path.basename(data_sample['image'][0])}'))
+                                        f"{os.path.basename(json_file)[:-4]}/{os.path.basename(data_sample['image'][0])}"))
                 results.append(dict(thought=thought,
                                     box=box,
                                     gt_bbox=gt_bbox,
