@@ -125,4 +125,4 @@ if __name__ == '__main__':
     image = Image.fromarray(image_np.astype(np.uint8))
     print(output_text)
     print(phrases)
-    image.show()
+    image.save('example.jpg')
