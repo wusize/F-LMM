@@ -47,7 +47,7 @@ def get_iou(bb1, bb2):
 def draw_box(image, box):
     image = np.array(image)
     image = mmcv.imshow_bboxes(img=image,
-                               bboxes=np.array(box),
+                               bboxes=np.array(box).view(1, 4),
                                colors='red',
                                thickness=2,
                                show=False)
