@@ -368,7 +368,7 @@ class FrozenHPTSAM(FrozenHPT):
                 stopping_criteria=self.stop_criteria,
                 use_cache=True)
 
-        answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=False)
+        answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
         print(answer, flush=True)
         # import time; time.sleep(5)
         return answer
