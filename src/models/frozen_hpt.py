@@ -367,7 +367,7 @@ class FrozenHPTSAM(FrozenHPT):
                 pad_token_id=self.tokenizer.pad_token_id,  # Pad token
                 use_cache=True)
 
-        answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        print(f"<start>{answer}<end>, {pixel_values.shape}", flush=True)
+        answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=False)
+        print(f"<start>{text}{answer}<end>, {pixel_values.shape}", flush=True)
         import time; time.sleep(5)
         return answer
