@@ -358,7 +358,7 @@ class FrozenHPTSAM(FrozenHPT):
             llm=self.llm, input_ids=input_ids, pixel_values=pixel_values)
 
         with torch.no_grad():
-            output_ids = self.llm(
+            output_ids = self.llm.generate(
                 **mm_inputs,
                 do_sample=False,
                 max_new_tokens=max_new_tokens,
