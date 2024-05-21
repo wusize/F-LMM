@@ -330,7 +330,7 @@ class FrozenHPTSAM(FrozenHPT):
         self.image_token_idx = self.tokenizer.encode(DEFAULT_IMAGE_TOKEN, add_special_tokens=False)[-1]
 
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
-        self.config = self.mgm.config
+        self.config = self.llm.config
 
     def generate(self, text, image, max_new_tokens):
         text = f"{DEFAULT_IMAGE_TOKEN}\n{text}"
