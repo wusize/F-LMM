@@ -383,16 +383,6 @@ class FrozenMGMSAM(FrozenMGM):
         input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
 
         image_tensor, image_tensor_aux = self._process_image(image.convert('RGB'))
-        # import pdb; pdb.set_trace()
-        with torch.no_grad():
-            outputs = self.mgm(input_ids=input_ids,
-                               images=image_tensor,
-                               images_aux=image_tensor_aux,
-                               output_hidden_states=True,
-                               output_attentions=True,
-                               return_dict=True,
-                               use_cache=False)
-
         with torch.inference_mode():
             output_ids = self.mgm.generate(
                 input_ids,
@@ -406,5 +396,5 @@ class FrozenMGMSAM(FrozenMGM):
                 use_cache=True)
 
         answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         return answer
