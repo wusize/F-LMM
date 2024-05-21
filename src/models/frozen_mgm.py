@@ -354,7 +354,7 @@ class FrozenMGMSAM(FrozenMGM):
             self.tokenizer = tokenizer
         self.prompt_template = prompt_template
         self.max_new_tokens = max_new_tokens
-        stop_words = self.prompt_template.get('STOP_WORDS', []) + ['.']   # only need the first sentence
+        stop_words = self.prompt_template.get('STOP_WORDS', [])   #  + ['.']   # only need the first sentence
         self.stop_criteria = StoppingCriteriaList()
         self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
                               for word in stop_words]
@@ -390,6 +390,7 @@ class FrozenMGMSAM(FrozenMGM):
                 images_aux=image_tensor_aux if len(image_tensor_aux) > 0 else None,
                 do_sample=False,
                 max_new_tokens=max_new_tokens,
+                stopping_criteria=self.stop_criteria,
                 bos_token_id=self.tokenizer.bos_token_id,  # Begin of sequence token
                 eos_token_id=self.tokenizer.eos_token_id,  # End of sequence token
                 pad_token_id=self.tokenizer.pad_token_id,  # Pad token

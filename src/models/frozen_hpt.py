@@ -313,7 +313,7 @@ class FrozenHPTSAM(FrozenHPT):
 
         self.prompt_template = prompt_template
         self.max_new_tokens = max_new_tokens
-        stop_words = self.prompt_template.get('STOP_WORDS', []) + ['.']   # only need the first sentence
+        stop_words = self.prompt_template.get('STOP_WORDS', []) #  + ['.']   # only need the first sentence
         self.stop_criteria = StoppingCriteriaList()
         self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
                               for word in stop_words]
@@ -365,9 +365,10 @@ class FrozenHPTSAM(FrozenHPT):
                 bos_token_id=self.tokenizer.bos_token_id,  # Begin of sequence token
                 eos_token_id=self.tokenizer.eos_token_id,  # End of sequence token
                 pad_token_id=self.tokenizer.pad_token_id,  # Pad token
+                stopping_criteria=self.stop_criteria,
                 use_cache=True)
 
         answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=False)
-        print(f"<start>{text}{answer}<end>, {pixel_values.shape}", flush=True)
-        import time; time.sleep(5)
+        print(answer, flush=True)
+        # import time; time.sleep(5)
         return answer
