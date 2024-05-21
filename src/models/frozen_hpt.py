@@ -368,5 +368,5 @@ class FrozenHPTSAM(FrozenHPT):
                 use_cache=True)
 
         answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        import pdb; pdb.set_trace()
+        print_log(answer)
         return answer
