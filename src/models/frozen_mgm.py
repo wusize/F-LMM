@@ -5,6 +5,8 @@ from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 from xtuner.model.utils import LoadWoInit
 from mmengine.logging import print_log
+from xtuner.utils.constants import IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
+
 
 @torch.no_grad()
 def compute_mask_IoU(masks, target):
@@ -338,3 +340,72 @@ class FrozenMGMSAM(FrozenMGM):
                      }
 
         return loss_dict
+
+    def _prepare_for_generation(self,
+                                tokenizer,
+                                prompt_template,
+                                max_new_tokens=512,
+                                **kwargs):
+        from transformers import StoppingCriteriaList
+        from xtuner.utils import StopWordStoppingCriteria
+        if isinstance(tokenizer, dict):
+            self.tokenizer = BUILDER.build(tokenizer)
+        else:
+            self.tokenizer = tokenizer
+        self.prompt_template = prompt_template
+        self.max_new_tokens = max_new_tokens
+        stop_words = self.prompt_template.get('STOP_WORDS', []) + ['.']   # only need the first sentence
+        self.stop_criteria = StoppingCriteriaList()
+        self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
+                              for word in stop_words]
+        for word in stop_words:
+            self.stop_criteria.append(
+                StopWordStoppingCriteria(self.tokenizer, word))
+        self._generation_ready = True
+
+        print_log(f"Manually add image token: {self.image_token}")
+        special_tokens_dict = {'additional_special_tokens': [self.image_token,]}
+        num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+        assert num_added_toks == 1
+
+        self.image_token_idx = self.tokenizer.encode(DEFAULT_IMAGE_TOKEN, add_special_tokens=False)[-1]
+
+        print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
+        self.config = self.mgm.config
+
+    def generate(self, text, image, max_new_tokens):
+        text = f"{DEFAULT_IMAGE_TOKEN}\n{text}"
+        prompt = self.tokenizer.encode(
+            self.prompt_template['INSTRUCTION'].format(input=text),
+            add_special_tokens=True)
+        input_ids = self.tokenizer.encode(prompt, add_special_tokens=True)
+        input_ids = torch.tensor(input_ids, dtype=torch.long, device=self.mgm.device)[None]
+
+        input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
+
+        image_tensor, image_tensor_aux = self._process_image(image.convert('RGB'))
+        # import pdb; pdb.set_trace()
+        with torch.no_grad():
+            outputs = self.mgm(input_ids=input_ids,
+                               images=image_tensor,
+                               images_aux=image_tensor_aux,
+                               output_hidden_states=True,
+                               output_attentions=True,
+                               return_dict=True,
+                               use_cache=False)
+
+        with torch.inference_mode():
+            output_ids = self.mgm.generate(
+                input_ids,
+                images=image_tensor,
+                images_aux=image_tensor_aux if len(image_tensor_aux) > 0 else None,
+                do_sample=False,
+                max_new_tokens=max_new_tokens,
+                bos_token_id=self.tokenizer.bos_token_id,  # Begin of sequence token
+                eos_token_id=self.tokenizer.eos_token_id,  # End of sequence token
+                pad_token_id=self.tokenizer.pad_token_id,  # Pad token
+                use_cache=True)
+
+        answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        import pdb; pdb.set_trace()
+        return answer
