@@ -617,6 +617,38 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         return pred_masks, sam_pred_masks
 
+    def generate(self, text, image, max_new_tokens):
+
+        assert self._generation_ready
+        conversation = [
+            {
+                "role": "User",
+                "content": f"<image_placeholder>{text}",
+                "images": ["image"],
+            },
+            {"role": "Assistant", "content": ""},
+        ]
+        # prepare for inputs
+        prepare_inputs = self.vl_chat_processor(
+            conversations=conversation, images=[image], force_batchify=True
+        )[0].to(self.deepseek_vl.device)
+
+        # run image encoder to get the image embeddings
+        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(**prepare_inputs)
+
+        # run the model to get the response
+        outputs = self.deepseek_vl.language_model.generate(
+            inputs_embeds=inputs_embeds,
+            attention_mask=prepare_inputs.attention_mask,
+            pad_token_id=self.tokenizer.eos_token_id,
+            eos_token_id=self.tokenizer.eos_token_id,
+            max_new_tokens=max_new_tokens,
+            do_sample=False,
+            use_cache=True,
+        )
+        answer = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return answer
+
 
 if __name__ == '__main__':
     from PIL import Image

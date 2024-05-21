@@ -37,7 +37,10 @@ class OurLMMsModel(lmms):
         self._tokenizer = BUILDER.build(cfg.tokenizer)
         self._model = MODELS.build(cfg.model)
         self._model._prepare_for_generation(tokenizer=cfg.tokenizer,
-                                            prompt_template=cfg.prompt_template)
+                                            prompt_template=cfg.prompt_template,
+                                            image_processor=cfg.image_processor,
+                                            lmm_name=cfg.get('lmm_name', None),
+                                            )
         self.model.eval()
         self._max_length = 2048
         self._config = self.model.config

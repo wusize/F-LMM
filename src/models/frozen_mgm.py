@@ -363,8 +363,8 @@ class FrozenMGMSAM(FrozenMGM):
                 StopWordStoppingCriteria(self.tokenizer, word))
         self._generation_ready = True
 
-        print_log(f"Manually add image token: {self.image_token}")
-        special_tokens_dict = {'additional_special_tokens': [self.image_token,]}
+        print_log(f"Manually add image token: {DEFAULT_IMAGE_TOKEN}")
+        special_tokens_dict = {'additional_special_tokens': [DEFAULT_IMAGE_TOKEN,]}
         num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
         assert num_added_toks == 1
 
