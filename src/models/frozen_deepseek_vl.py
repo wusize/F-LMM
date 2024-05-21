@@ -372,9 +372,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 },
                 {"role": "Assistant", "content": ""}
             ]
-            return thought, bbox, self.conversation(conversation, [image, image_crop])
+            return thought, bbox, self.conversation(conversation, [image, image_crop]), pred_mask
         else:
-            return thought, bbox, self.visual_cot_v3(image_crop, question)[-1]
+            return thought, bbox, self.visual_cot_v3(image_crop, question)[-1], pred_mask
 
     @torch.no_grad()
     def visual_cot_v2(self, image, question, *args, **kwargs):
@@ -457,9 +457,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 },
                 {"role": "Assistant", "content": ""}
             ]
-            return '', bbox, self.conversation(conversation, [image, image_crop])
+            return '', bbox, self.conversation(conversation, [image, image_crop]), pred_mask
         else:
-            return '', bbox, self.visual_cot_v3(image_crop, question)[-1]
+            return '', bbox, self.visual_cot_v3(image_crop, question)[-1], pred_mask
 
     def mask2box(self, mask):
         scale = self.box_scale
@@ -493,7 +493,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             },
             {"role": "Assistant", "content": ""},
         ]
-        return '', (0, 0, image.width, image.height), self.conversation(conversation, [image])
+        return '', (0, 0, image.width, image.height), self.conversation(conversation, [image]), None
 
     @torch.no_grad()
     def visual_cot_v4(self, image, question, bbox, **kwargs):
@@ -512,7 +512,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             },
             {"role": "Assistant", "content": ""}
         ]
-        return '', bbox, self.conversation(conversation, [image, image_crop])
+        return '', bbox, self.conversation(conversation, [image, image_crop]), None
 
     def conversation(self, conversation, images):
         # prepare for inputs

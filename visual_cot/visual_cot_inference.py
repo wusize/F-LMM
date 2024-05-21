@@ -11,6 +11,7 @@ from xtuner.registry import BUILDER
 from PIL import Image
 from xtuner.model.utils import guess_load_checkpoint
 import mmcv
+from torch.nn.functional import interpolate
 
 def get_iou(bb1, bb2):
     assert bb1[0] < bb1[2]
@@ -45,15 +46,27 @@ def get_iou(bb1, bb2):
 
 
 def draw_box(image, box):
-    image = np.array(image)
+    image = np.array(image.convert('RGB'))
     image = mmcv.imshow_bboxes(img=image,
                                bboxes=np.array(box).reshape(1, 4),
-                               colors='red',
+                               colors=(255, 0, 0),
                                thickness=2,
                                show=False)
 
     return Image.fromarray(image)
 
+
+def draw_mask(image, mask):
+    image = np.array(image.convert('RGB')).astype(np.float32)
+    image[mask] = image[mask] * 0.5 + np.array([255, 0, 0], dtype=np.float32).reshape(1, 1, 3) * 0.5
+    image = image.astype(np.uint8)
+    image = mmcv.imshow_bboxes(img=image,
+                               bboxes=np.array(box).reshape(1, 4),
+                               colors=(255, 0, 0),
+                               thickness=2,
+                               show=False)
+
+    return Image.fromarray(image)
 
 
 if __name__ == '__main__':
@@ -132,10 +145,14 @@ if __name__ == '__main__':
                 question = question.replace('<image>', '').strip()
                 gt_bbox = data_sample['image'][1].split('###')[-1].replace('[', '').replace(']', '')
                 gt_bbox = [int(x) for x in gt_bbox.split(',')]
-                thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
+                thought, box, answer, mask = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
                 # iou = get_iou(box, gt_bbox)
                 # ious.append(iou)
                 image = draw_box(image, box)
+                if mask is not None:
+                    mask = interpolate(mask[None, None].float(), size=(image.height, image.width), mode='bilinear')
+                    mask = (mask[0, 0] > 0.0).cpu().numpy()
+                    image = draw_mask(image, mask)
                 image.save(os.path.join(args.save_folder,
                                         f"{os.path.basename(json_file)[:-4]}/{os.path.basename(data_sample['image'][0])}"))
                 results.append(dict(thought=thought,
