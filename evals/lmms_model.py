@@ -143,18 +143,9 @@ class OurLMMsModel(lmms):
         pbar = tqdm(total=len(requests), disable=(self.rank != 0), desc="Model Responding")
 
         for contexts, gen_kwargs, doc_to_visual, doc_id, task, split in [reg.args for reg in requests]:
-            # import pdb; pdb.set_trace()
-            # encode, pad, and truncate contexts for this batch
             visuals = [doc_to_visual(self.task_dict[task][split][doc_id])]
             visuals = self.flatten(visuals)
             assert len(visuals) == 1, f"Currently only support 1 image: {contexts}, {visuals}"
-            # input_ids, image = self.process_input(contexts, visuals[0])
-            # output_ids = self.model.caption_forward(image, input_ids, max_tokens_new=512)
-            # output_ids = output_ids[0][output_ids[0] != IMAGE_TOKEN_INDEX]
-            #
-            # # Post-processing
-            # text_output = self.tokenizer.decode(output_ids, skip_special_tokens=False)
-            contexts = contexts if len(self.custom_prompt) == 0 else self.custom_prompt
             max_new_tokens = gen_kwargs.get('max_new_tokens', 100)
             content = self.model.generate(contexts, visuals[0], max_new_tokens=max_new_tokens)
             res.append(content)
