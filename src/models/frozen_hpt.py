@@ -339,7 +339,7 @@ class FrozenHPTSAM(FrozenHPT):
                 image,
                 tuple(
                     int(x * 255) for x in self.image_processor.image_mean))
-        pixel_values = self.image_processor.preprocess(image, return_tensors='pt')['pixel_values'][0]
+        pixel_values = torch.from_numpy(self.image_processor.preprocess(image)['pixel_values'][0])
         with torch.inference_mode():
             pixel_values = pixel_values[None].to(device=self.visual_encoder.device,
                                                  dtype=self.visual_encoder.dtype)

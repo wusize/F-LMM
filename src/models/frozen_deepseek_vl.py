@@ -270,6 +270,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         self.box_scale = box_scale
         self.use_sam = use_sam
         self.kmeans = kmeans
+        self.config = self.deepseek_vl.config
         print_log(f"USE SAM? {use_sam}")
         print_log(f"KMeans? {kmeans}")
 
