@@ -375,10 +375,9 @@ class FrozenMGMSAM(FrozenMGM):
 
     def generate(self, text, image, max_new_tokens):
         text = f"{DEFAULT_IMAGE_TOKEN}\n{text}"
-        prompt = self.tokenizer.encode(
+        input_ids = self.tokenizer.encode(
             self.prompt_template['INSTRUCTION'].format(input=text),
             add_special_tokens=True)
-        input_ids = self.tokenizer.encode(prompt, add_special_tokens=True)
         input_ids = torch.tensor(input_ids, dtype=torch.long, device=self.mgm.device)[None]
 
         input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
