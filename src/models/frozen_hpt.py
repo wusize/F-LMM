@@ -368,5 +368,5 @@ class FrozenHPTSAM(FrozenHPT):
                 use_cache=True)
 
         answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
-        print_log(f"<start>{answer}<end>")
+        print_log(f"<start>{answer}<end>, {pixel_values.shape}")
         return answer
