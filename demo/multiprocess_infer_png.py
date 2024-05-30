@@ -47,7 +47,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     os.makedirs(args.save_dir, exist_ok=True)
-    for subset in ['gt', 'sam', 'conv', 'attn']:
+    for subset in ['gt', 'sam', 'conv', 'attn', 'attn_all']:
         os.makedirs(os.path.join(args.save_dir, subset), exist_ok=True)
 
     accelerator = Accelerator()
@@ -146,3 +146,5 @@ if __name__ == '__main__':
             conv_image.save(os.path.join(args.save_dir, f'conv/{file_name}'))
             attn_image.save(os.path.join(args.save_dir, f'attn/{file_name}'))
             all_in_one.save(os.path.join(args.save_dir, file_name))
+
+            np.save(os.path.join(args.save_dir, f'attn_all/{file_name[:-4]}.npy'), mask_attentions.cpu().numpy())
