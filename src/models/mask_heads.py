@@ -168,6 +168,7 @@ class SingleConvHead(nn.Module):
 if __name__ == '__main__':
     from mmseg.models.backbones.unet import InterpConv
     from torch.nn.modules.normalization import GroupNorm
+    import numpy as np
     unet = UNetHead(normalize_input=True,
                     upsample_input=64,   # upsample the low-res input (24x24) to (64 x 64)
                     in_channels=2048,
@@ -182,6 +183,9 @@ if __name__ == '__main__':
                     upsample_cfg=dict(type=InterpConv)
                     )
 
+    n_params = sum([np.prod(p.size()) for p in unet.parameters() if p.requires_grad])
+    print(n_params)
+
     torch.save(unet.state_dict(), 'data/unet.pth')
 
     fcn = FCNHead(normalize_input=True,
@@ -191,4 +195,6 @@ if __name__ == '__main__':
                   in_channels=2048,
                   norm_cfg=dict(type=GroupNorm, num_groups=1),
                   channels=256)
+    n_params = sum([np.prod(p.size()) for p in fcn.parameters() if p.requires_grad])
+    print(n_params)
     torch.save(fcn.state_dict(), 'data/fcn.pth')

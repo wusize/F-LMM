@@ -6,8 +6,10 @@ from mmengine.model import BaseModel
 from xtuner.model.utils import LoadWoInit
 from mmengine.logging import print_log
 from xtuner.model.llava import prepare_inputs_labels_for_multimodal
-from xtuner.utils.constants import IMAGE_TOKEN_INDEX, IGNORE_INDEX
+from xtuner.utils.constants import IMAGE_TOKEN_INDEX, IGNORE_INDEX, DEFAULT_IMAGE_TOKEN
 from src.models.siglip.modeling_siglip import SiglipVisionModel
+from xtuner.dataset.utils import expand2square
+
 
 @torch.no_grad()
 def compute_mask_IoU(masks, target):
@@ -291,3 +293,82 @@ class FrozenHPTSAM(FrozenHPT):
 
         return loss_dict
 
+    def _prepare_for_generation(self,
+                                image_processor,
+                                tokenizer,
+                                prompt_template,
+                                max_new_tokens=512,
+                                **kwargs):
+        from transformers import StoppingCriteriaList
+        from xtuner.utils import StopWordStoppingCriteria
+        if isinstance(tokenizer, dict):
+            self.tokenizer = BUILDER.build(tokenizer)
+        else:
+            self.tokenizer = tokenizer
+
+        if isinstance(image_processor, dict):
+            self.image_processor = BUILDER.build(image_processor)
+        else:
+            self.image_processor = image_processor
+
+        self.prompt_template = prompt_template
+        self.max_new_tokens = max_new_tokens
+        stop_words = self.prompt_template.get('STOP_WORDS', []) #  + ['.']   # only need the first sentence
+        self.stop_criteria = StoppingCriteriaList()
+        self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
+                              for word in stop_words]
+        for word in stop_words:
+            self.stop_criteria.append(
+                StopWordStoppingCriteria(self.tokenizer, word))
+        self._generation_ready = True
+
+        print_log(f"Manually add image token: {DEFAULT_IMAGE_TOKEN}")
+        special_tokens_dict = {'additional_special_tokens': [DEFAULT_IMAGE_TOKEN,]}
+        num_added_toks = self.tokenizer.add_special_tokens(special_tokens_dict)
+        assert num_added_toks == 1
+
+        self.image_token_idx = self.tokenizer.encode(DEFAULT_IMAGE_TOKEN, add_special_tokens=False)[-1]
+
+        print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
+        self.config = self.llm.config
+
+    def generate(self, text, image, max_new_tokens):
+        text = f"{DEFAULT_IMAGE_TOKEN}\n{text}"
+        image = image.convert('RGB')
+        image = expand2square(
+                image,
+                tuple(
+                    int(x * 255) for x in self.image_processor.image_mean))
+        pixel_values = torch.from_numpy(self.image_processor.preprocess(image)['pixel_values'][0])
+        with torch.inference_mode():
+            pixel_values = pixel_values[None].to(device=self.visual_encoder.device,
+                                                 dtype=self.visual_encoder.dtype)
+            visual_outputs = self.visual_encoder(pixel_values, output_hidden_states=True)
+            pixel_values = self.projector(
+                visual_outputs.hidden_states[self.visual_select_layer][:, -self.num_patches:].to(self.projector.dtype)
+            ).to(self.llm.dtype)
+
+        input_ids = self.tokenizer.encode(
+            self.prompt_template['INSTRUCTION'].format(input=text),
+            add_special_tokens=True)
+        input_ids = torch.tensor(input_ids, dtype=torch.long, device=self.llm.device)[None]
+        input_ids[input_ids == self.image_token_idx] = IMAGE_TOKEN_INDEX
+
+        mm_inputs = prepare_inputs_labels_for_multimodal(
+            llm=self.llm, input_ids=input_ids, pixel_values=pixel_values)
+
+        with torch.no_grad():
+            output_ids = self.llm.generate(
+                **mm_inputs,
+                do_sample=False,
+                max_new_tokens=max_new_tokens,
+                bos_token_id=self.tokenizer.bos_token_id,  # Begin of sequence token
+                eos_token_id=self.tokenizer.eos_token_id,  # End of sequence token
+                pad_token_id=self.tokenizer.pad_token_id,  # Pad token
+                stopping_criteria=self.stop_criteria,
+                use_cache=True)
+
+        answer = self.tokenizer.decode(output_ids[0], skip_special_tokens=True)
+        # print(answer, flush=True)
+        # import time; time.sleep(5)
+        return answer

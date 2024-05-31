@@ -175,7 +175,7 @@ class VLMImageProcessor(BaseImageProcessor):
 
         return x, meta
 
-    def preprocess(self, images, return_tensors=None, **kwargs) -> BatchFeature:
+    def preprocess(self, images, return_tensors=None, **kwargs):
         # resize and pad to [self.image_size, self.image_size]
         # then convert from [H, W, 3] to [3, H, W]
         # images: List[np.ndarray] = [self.resize(image) for image in images]
@@ -209,8 +209,12 @@ class VLMImageProcessor(BaseImageProcessor):
         data = {"pixel_values": images}
         if not return_tensors:
             data.update({"image_sizes": image_sizes, "meta_datas": meta_datas})
+        output = BatchFeature(data=data, tensor_type=return_tensors)
+        if return_tensors:
+            output.image_sizes = image_sizes
+            output.meta_datas = meta_datas
 
-        return BatchFeature(data=data, tensor_type=return_tensors)
+        return output
 
     @property
     def default_shape(self):

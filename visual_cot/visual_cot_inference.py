@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import numpy as np
 from glob import glob
 from accelerate import Accelerator
 from tqdm import tqdm
@@ -9,6 +10,8 @@ from mmengine.config import Config
 from xtuner.registry import BUILDER
 from PIL import Image
 from xtuner.model.utils import guess_load_checkpoint
+import mmcv
+from torch.nn.functional import interpolate
 
 def get_iou(bb1, bb2):
     assert bb1[0] < bb1[2]
@@ -42,10 +45,35 @@ def get_iou(bb1, bb2):
     return iou
 
 
+def draw_box(image, box):
+    image = np.array(image.convert('RGB'))
+    image = mmcv.imshow_bboxes(img=image,
+                               bboxes=np.array(box).reshape(1, 4),
+                               colors=(255, 0, 0),
+                               thickness=2,
+                               show=False)
+
+    return Image.fromarray(image)
+
+
+def draw_mask(image, mask):
+    image = np.array(image.convert('RGB')).astype(np.float32)
+    image[mask] = image[mask] * 0.5 + np.array([255, 0, 0], dtype=np.float32).reshape(1, 1, 3) * 0.5
+    image = image.astype(np.uint8)
+    image = mmcv.imshow_bboxes(img=image,
+                               bboxes=np.array(box).reshape(1, 4),
+                               colors=(255, 0, 0),
+                               thickness=2,
+                               show=False)
+
+    return Image.fromarray(image)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
-    parser.add_argument('--checkpoint', default='', type=str)
+    parser.add_argument('--checkpoint',
+                        default='checkpoints/frozen_deepseek_vl_1_3b_unet_sam_l_iter_95080.pth', type=str)
     parser.add_argument('--image_folder', default='data', type=str)
     parser.add_argument('--version', default='v1', type=str)
     parser.add_argument('--save_folder', default='visual_cot', type=str)
@@ -58,6 +86,8 @@ if __name__ == '__main__':
     os.makedirs(args.save_folder, exist_ok=True)
     args.save_folder = os.path.join(args.save_folder,
                                     f'{model_name}_visual_cot_{args.version}')
+    if args.debug:
+        args.save_folder += 'debug'
     os.makedirs(args.save_folder, exist_ok=True)
 
     message = [f"Hello this is GPU {accelerator.process_index}"]
@@ -98,10 +128,11 @@ if __name__ == '__main__':
         accelerator.wait_for_everyone()
         data_ids = list(range(len(data)))
         if args.debug:
-            data_ids = data_ids[::100]
+            data_ids = data_ids[::50]
 
         results = []
         # ious = []
+        os.makedirs(os.path.join(args.save_folder, f'{os.path.basename(json_file)[:-4]}'), exist_ok=True)
         with accelerator.split_between_processes(data_ids) as sub_ids:
             for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
                 data_sample = data[idx]
@@ -114,10 +145,16 @@ if __name__ == '__main__':
                 question = question.replace('<image>', '').strip()
                 gt_bbox = data_sample['image'][1].split('###')[-1].replace('[', '').replace(']', '')
                 gt_bbox = [int(x) for x in gt_bbox.split(',')]
-                # import pdb; pdb.set_trace()
-                thought, box, answer = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
+                thought, box, answer, mask = getattr(model, f'visual_cot_{args.version}')(image, question, gt_bbox)
                 # iou = get_iou(box, gt_bbox)
                 # ious.append(iou)
+                image = draw_box(image, box)
+                if mask is not None:
+                    mask = interpolate(mask[None, None].float(), size=(image.height, image.width), mode='bilinear')
+                    mask = (mask[0, 0] > 0.0).cpu().numpy()
+                    image = draw_mask(image, mask)
+                image.save(os.path.join(args.save_folder,
+                                        f"{os.path.basename(json_file)[:-4]}/{os.path.basename(data_sample['image'][0])}"))
                 results.append(dict(thought=thought,
                                     box=box,
                                     gt_bbox=gt_bbox,

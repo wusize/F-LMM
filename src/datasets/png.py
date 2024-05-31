@@ -184,6 +184,7 @@ class PNGDataset(Dataset):
                     image_sizes=torch.tensor(image_data['image_sizes'][0]),
                     mask_infos=mask_infos,
                     image=image,
+                    file_name=image_info['file_name'],
                     meta_data=meta_data,
                     labels=labels)
 
