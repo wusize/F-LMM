@@ -9,27 +9,23 @@ from transformers import AutoTokenizer
 from xtuner.engine.runner import TrainLoop
 
 from mmengine.dataset import DefaultSampler
-from src.datasets.gcg import concat_datasets, gcg_collate_fn
-from src.datasets.png import PNGDataset
-from src.models.llava_next.modeling_llava_next import CustomLlavaNextForConditionalGeneration
-from src.datasets.llava_next_processors import CustomLlavaNextImageProcessor
-from src.models.frozen_llava_next import FrozenLlavaNextSAM
-from src.models.mask_heads import UNetHead
+from flmm.datasets.png import PNGDataset, concat_datasets, custom_collate_fn
+from llava.modeling_llava_next import CustomLlavaNextForConditionalGeneration
+from flmm.datasets.llava_next_processors import CustomLlavaNextImageProcessor
+from flmm.models.frozen_llava_next import FrozenLlavaNextSAM
+from flmm.models.mask_head.mask_decoder import UNetHead
 from xtuner.utils.templates import PROMPT_TEMPLATE
-from src.models.segment_modules.sam_wrapper import SAMWrapper
+from flmm.models.mask_head.mask_refiner import SAMWrapper
 from mmdet.models import DiceLoss, CrossEntropyLoss
 from mmseg.models.backbones.unet import InterpConv
 from mmdet.datasets import RefCocoDataset
-from src.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
+from flmm.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
 from mmdet.datasets.transforms import LoadAnnotations
 
 
 #######################################################################
 #                          PART 1  Settings                           #
 #######################################################################
-# runner_type = CustomRunner
-# find_unused_parameters = True
-
 # Scheduler & Optimizer
 batch_size = 1  # per_device
 accumulative_counts = 1
@@ -128,9 +124,9 @@ refcoco_pipeline = [
     ]
 datasets_list = [
     dict(type=PNGDataset,
-         json_file='data/png_coco_train2017.json',
+         json_file='data/coco/annotations/png_coco_train2017.json',
          panoptic_json_file='data/coco/annotations/panoptic_train2017.json',
-         panoptic_png_path='data/coco/panoptic_train2017',
+         panoptic_png_path='data/coco/annotations/panoptic_train2017',
          tokenizer=tokenizer,
          image_processor=image_processor,
          prompt_template=prompt_template,
@@ -165,7 +161,7 @@ train_dataloader = dict(
     dataset=dict(type=concat_datasets,
                  datasets_list=datasets_list),
     sampler=dict(type=DefaultSampler, shuffle=True),
-    collate_fn=dict(type=gcg_collate_fn))
+    collate_fn=dict(type=custom_collate_fn))
 
 #######################################################################
 #                    PART 4  Scheduler & Optimizer                    #
@@ -218,8 +214,8 @@ default_hooks = dict(
     checkpoint=dict(
         type=CheckpointHook,
         by_epoch=False,
-        # save_optimizer=False,
         interval=save_steps,
+        # save_optimizer=False,
         max_keep_ckpts=save_total_limit),
     # set sampler seed in distributed evrionment.
     sampler_seed=dict(type=DistSamplerSeedHook),
