@@ -40,7 +40,7 @@ them under `data/coco/annotations`.
 to prepare RefCOCO datasets.
 
 
-**[VisCoT](https://github.com/deepcs233/Visual-CoT)** We have prepared the test images under 
+**[VisCoT](https://github.com/deepcs233/Visual-CoT).** We have prepared the test images under 
 [Google Drive](https://drive.google.com/drive/folders/1j25nY7i47OudmyzZFyps8NmzVHx6sf5O?usp=drive_link). Download and
 extract the zip files under `data/cot`.
 
