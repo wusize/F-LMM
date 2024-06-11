@@ -1,6 +1,5 @@
-# todo: eval the 8 subsets of refcoco in one pass
 from mmdet.datasets import RefCocoDataset
-from src.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
+from flmm.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
 from mmdet.datasets.transforms import LoadAnnotations
 from mmdet.evaluation import RefSegMetric
 import argparse

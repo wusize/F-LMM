@@ -2,7 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import argparse
-from src.datasets.png import PNGDataset
+from flmm.datasets.png import PNGDataset
 from tqdm import tqdm
 from xtuner.registry import BUILDER
 from mmengine.config import Config
@@ -96,9 +96,9 @@ if __name__ == '__main__':
     model = model.to(device=accelerator.device)
     model.eval()
 
-    dataset_params = dict(json_file='data/png_coco_val2017.json',
+    dataset_params = dict(json_file='data/coco/annotations/png_coco_val2017.json',
                           panoptic_json_file='data/coco/annotations/panoptic_val2017.json',
-                          panoptic_png_path='data/coco/panoptic_val2017',
+                          panoptic_png_path='data/coco/annotations/panoptic_val2017',
                           tokenizer=tokenizer,
                           image_processor=image_processor,
                           prompt_template=prompt_template,
