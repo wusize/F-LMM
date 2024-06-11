@@ -97,21 +97,23 @@ NPROC_PER_NODE=8 xtuner train configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_u
 Currently, there are bugs when deepspeed_zero3 is used, we are going to resolve this issue in the future.
 
 ### Test
-The checkpoints of our trained models are as follows.
 **Checkpoints.**
+The checkpoints of our trained models are available on 
+[Google Drive](https://drive.google.com/drive/folders/1bvrDqm9m4MvcocuwvvkGf_qYRBfvr0K7?usp=sharing). Download and put
+them under `checkpoints/`.
 
 | #  |          LMM         |                                                            Configs                                                             |                                         Checkpoints                                         |
 |:--:|:---------------------:|:------------------------------------------------------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------------:|
-| 1  |     LLaVA-1.5-7B          |    [frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png](configs/llava/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.py)     | [model](https://drive.google.com/file/d/1Nz1xH7cbR8HEW40rMtYUn3PE5ypLw5vb/view?usp=sharing) |
-| 2  | LLaVA-Next-Vicuna-7B      |                       [frozen_llava_next_vicuna_7b_unet_sam_l_refcoco_png](configs/llava_next/frozen_llava_next_vicuna_7b_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1Tf8gJWmbRnsX8verC6Ee7lK3Dm781p5M/view?usp=sharing) |
-| 3  | LLaVA-Next-Mistral-7B      |                      [frozen_llava_next_mistral_7b_unet_sam_l_refcoco_png](configs/llava_next/frozen_llava_next_mistral_7b_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1lfaSAenNpfE1Smiv2WIdj0y4Mcb3NrP7/view?usp=sharing) |
-| 4  |    DeepSeekVL-1.3B         |                      [frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png](configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py)                      | [model](https://drive.google.com/file/d/1vycKoimE2-QHjzQFCXMc4YH-tfJq-GMT/view?usp=sharing) |
-| 5  |     DeepSeekVL-7B         |                       [frozen_deepseek_vl_7b_chat_unet_sam_l_refcoco_png](configs/deepseek_vl/frozen_deepseek_vl_7b_chat_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1UQ3YpYeoXs4ESruUqrpWE4VwOD5UHp-S/view?usp=sharing) |
-| 6  |     MiniGemini-2B       |                              [frozen_mgm_gemma_2b_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_gemma_2b_unet_sam_l_refcoco_png.py)                               | [model](https://drive.google.com/file/d/1unxcWfzNQfyPj_PYtgtr8prne63l80eh/view?usp=sharing) |
-| 7  |     MiniGemini-7B       |                              [frozen_mgm_vicuna_7b_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_vicuna_7b_unet_sam_l_refcoco_png.py)                              | [model](https://drive.google.com/file/d/1-yfrMVaS4aN5uZSYCTalhJ_Pq3j_2aT4/view?usp=sharing) |
-| 8  |   MiniGemini-HD-7B      |                            [frozen_mgm_vicuna_7b_hd_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_vicuna_7b_hd_unet_sam_l_refcoco_png.py)                             | [model](https://drive.google.com/file/d/1_bQMw-R0tBgvFWAAJFi7RbAHN4-OYIz0/view?usp=sharing) |
-| 9  |        HPT-Air           |                                 [frozen_hpt_air_unet_sam_l_refcoco_png](configs/hpt/frozen_hpt_air_unet_sam_l_refcoco_png.py)                                 | [model](https://drive.google.com/file/d/1-yfrMVaS4aN5uZSYCTalhJ_Pq3j_2aT4/view?usp=sharing) |
-| 10 |      HPT-Air-1.5          |                               [frozen_hpt_air_1_5_unet_sam_l_refcoco_png](configs/hpt/frozen_hpt_air_1_5_unet_sam_l_refcoco_png.py)                               | [model](https://drive.google.com/file/d/1_bQMw-R0tBgvFWAAJFi7RbAHN4-OYIz0/view?usp=sharing) |
+| 1  |     LLaVA-1.5-7B          |    [frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png](configs/llava/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.py)     | [model](https://drive.google.com/file/d/1opjFe15B5L5JJ78gE_FsXvDnwSlwSHhh/view?usp=sharing) |
+| 2  | LLaVA-Next-Vicuna-7B      |                       [frozen_llava_next_vicuna_7b_unet_sam_l_refcoco_png](configs/llava_next/frozen_llava_next_vicuna_7b_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1N-olLqhZdPEySt8Asu2cvLJBaL1VHTqa/view?usp=drive_link) |
+| 3  | LLaVA-Next-Mistral-7B      |                      [frozen_llava_next_mistral_7b_unet_sam_l_refcoco_png](configs/llava_next/frozen_llava_next_mistral_7b_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/13rHaEZ62Q-VX5iKhOQnlm4yH1TMOBalH/view?usp=drive_link) |
+| 4  |    DeepSeekVL-1.3B         |                      [frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png](configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py)                      | [model](https://drive.google.com/file/d/1UXcjJrrpTm1bNphvPNjvol9gUfvzNbjA/view?usp=drive_link) |
+| 5  |     DeepSeekVL-7B         |                       [frozen_deepseek_vl_7b_chat_unet_sam_l_refcoco_png](configs/deepseek_vl/frozen_deepseek_vl_7b_chat_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1LOwIAYVyR51e34ksV9jz-GGiFfmkZLj_/view?usp=drive_link) |
+| 6  |     MiniGemini-2B       |                              [frozen_mgm_gemma_2b_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_gemma_2b_unet_sam_l_refcoco_png.py)                               | [model](https://drive.google.com/file/d/13wHk-dHa4in1rfIRzKCf-xEHwhaCz_6Y/view?usp=drive_link) |
+| 7  |     MiniGemini-7B       |                              [frozen_mgm_vicuna_7b_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_vicuna_7b_unet_sam_l_refcoco_png.py)                              | [model](https://drive.google.com/file/d/1Gg57bLJfx2zvYQyyE7Fjfw3hCq9ucVyN/view?usp=drive_link) |
+| 8  |   MiniGemini-HD-7B      |                            [frozen_mgm_vicuna_7b_hd_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_vicuna_7b_hd_unet_sam_l_refcoco_png.py)                             | [model](https://drive.google.com/file/d/1CDRI1l0FdTra7EZH_NNEha_QfA2cdbYb/view?usp=drive_link) |
+| 9  |        HPT-Air           |                                 [frozen_hpt_air_unet_sam_l_refcoco_png](configs/hpt/frozen_hpt_air_unet_sam_l_refcoco_png.py)                                 | [model](https://drive.google.com/file/d/1_gU4olEjsYvBvcq6yWGklSxNAv-Yz44T/view?usp=drive_link) |
+| 10 |      HPT-Air-1.5          |                               [frozen_hpt_air_1_5_unet_sam_l_refcoco_png](configs/hpt/frozen_hpt_air_1_5_unet_sam_l_refcoco_png.py)                               | [model](https://drive.google.com/file/d/1Q-asMx7C3onXnmxqEZzecMHHCccqkzaP/view?usp=drive_link) |
 
 
 **Panoptic Narrative Grounding (PNG).**
@@ -119,14 +121,14 @@ The checkpoints of our trained models are as follows.
 export PYTHONPATH=.
 accelerate launch scripts/multiprocess_eval_png.py \
  configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
-  --checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth
+  --checkpoint checkpoints/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth
 ```
 **Referring Expression Segmentation (RES).**
 ```shell
 export PYTHONPATH=.
 accelerate launch scripts/multiprocess_eval_refcoco.py \
  configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
-  --checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth --concat
+  --checkpoint checkpoints/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth --concat
 ```
 **Visual Chain-of-Thought Reasoning.** For now we only implement VisCot on DeepSeekVL models that work well with 
 multi-image inputs. 
@@ -135,7 +137,7 @@ multi-image inputs.
 ```shell
 export PYTHONPATH=.
 accelerate launch scripts/visual_cot/visual_cot_inference.py configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
---checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth \ 
+--checkpoint checkpoints/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth \ 
 --version v1 --save_folder the/directory/of/result/json/files  --discard_sam
 ```
 
@@ -165,7 +167,9 @@ This project is licensed under [NTU S-Lab License 1.0](LICENSE).
 
 ## Acknowledgement
 
-This project is impossible without the open-source efforts of large multimodal models in the community, including 
-LLaVA, DeepSeek-VL, MiniGemini and HPT. In addition, we also thank open-source code bases from transformers and mmengine
-teams that facilitate the development of this project.
+This project is impossible without open-source efforts of large multimodal models in the community, including 
+[LLaVA](https://huggingface.co/llava-hf), [DeepSeek-VL](https://github.com/deepseek-ai/DeepSeek-VL), 
+[MiniGemini](https://github.com/dvlab-research/MGM) and [HPT](https://github.com/HyperGAI/HPT). In addition, we also 
+thank open-source code bases from [transformers](https://github.com/huggingface/transformers) and 
+[openmmlab](https://github.com/open-mmlab) teams that facilitate the development of this project.
 
