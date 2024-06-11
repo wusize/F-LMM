@@ -14,14 +14,14 @@ It is currently under construction.
 - [ ] Evaluation code and checkpoints
 - [ ] Interactive Demo
 
-## Installation
+## Dependencies
 
 1. This project is built on [Xtuner](https://github.com/InternLM/xtuner). The segmentation modules 
 including the U-Net and training losses are 
 from [MMSegmentation](https://github.com/open-mmlab/mmsegmentation) and 
 [MMDetection](https://github.com/open-mmlab/mmdetection). Please refer to the official documents of these toolkits for installation guidance.
 
-2. The version of [transformers](https://github.com/huggingface/transformers) used in this project is v4.39.0. And we
+2. The version of [transformers](https://github.com/huggingface/transformers) used in this project is v4.39.1. And we
 find using versions beyond v4.40.0 cannot reproduce the performances (we are debugging on this issue). 
 
 3. Accelerate is used to build the evaluation pipeline of our models. Please refer to its official
@@ -99,7 +99,12 @@ The checkpoints of our trained models are as follows.
 **Checkpoints.**
 
 **Panoptic Narrative Grounding (PNG).**
-
+```shell
+export PYTHONPATH=.
+accelerate launch tools/multiprocess_eval_png.py \
+ configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_lite_sam_l_refcoco_png.py \
+  --checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_lite_sam_l_refcoco_png/iter_95080.pth
+```
 **Referring Expression Segmentation (RES).**
 
 **Visual Chain-of-Thought Reasoning**

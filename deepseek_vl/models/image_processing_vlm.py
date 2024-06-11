@@ -28,7 +28,7 @@ from transformers import AutoImageProcessor, PretrainedConfig
 from transformers.image_processing_utils import BaseImageProcessor, BatchFeature
 from transformers.image_utils import to_numpy_array
 from transformers.utils import logging
-from src.utils import multi_apply
+from flmm.utils import multi_apply
 
 logger = logging.get_logger(__name__)
 
