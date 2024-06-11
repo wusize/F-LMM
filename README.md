@@ -1,5 +1,5 @@
 # F-LMM: Grounding Frozen Large Multimodal Models
-![](flmm_pipeline.jpg)
+![](images/flmm_pipeline.jpg)
 ## Introduction
 
 This is the official release of paper **F-LMM: Grounding Frozen Large Multimodal Models**. 
@@ -130,8 +130,11 @@ accelerate launch scripts/multiprocess_eval_refcoco.py \
  configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
   --checkpoint checkpoints/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth --concat
 ```
-**Visual Chain-of-Thought Reasoning.** For now we only implement VisCot on DeepSeekVL models that work well with 
-multi-image inputs. 
+**Visual Chain-of-Thought Reasoning.**
+
+For now we only implement VisCot on DeepSeekVL models that work well with 
+multi-image inputs. Some examples of visual cot is shown below.
+![](images/flmm_visual_cot.jpg)
 
 ***1. Inference.*** 
 ```shell
