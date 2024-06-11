@@ -7,7 +7,7 @@ It is currently under construction.
 
 > [**F-LMM: Grounding Frozen Large Multimodal Models**](https://arxiv.org/abs/2406.05821),            
 > Size Wu, Wenwei Zhang, Lumin Xu, Sheng Jin, Wentao Liu, Wei Li, Chen Change Loy            
-> [Bibetex](https://github.com/wusize/F-LMM#citation)
+> [Bibtex](https://github.com/wusize/F-LMM#citation)
 
 ## TODO
 - [x] Training code
