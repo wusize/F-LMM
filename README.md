@@ -152,6 +152,11 @@ python scripts/visual_cot/gpt_eval_cot_score.py --result_dir the/directory/of/al
 ```
 
 
+## Demo
+
+**Grounded Human-AI Conversation**. An interactive demo is coming soon. Below are some examples of grounded conversation.
+![](images/flmm_chat_vis.jpg)
+
 ## Citation
 
 ```bibtex
