@@ -236,7 +236,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                 use_sam=True,
                                 kmeans=False,
                                 **kwargs):
-        from third_parties.deepseek_vl import VLChatProcessor
+        from deepseek_vl.models import VLChatProcessor
         from transformers import StoppingCriteriaList
         from xtuner.utils import StopWordStoppingCriteria
         if isinstance(image_processor, dict):

@@ -10,8 +10,8 @@ It is currently under construction.
 > [Bibetex](https://github.com/wusize/F-LMM#citation)
 
 ## TODO
-- [ ] Training code
-- [ ] Evaluation code and checkpoints
+- [x] Training code
+- [x] Evaluation code and checkpoints
 - [ ] Interactive Demo
 
 ## Dependencies
@@ -83,37 +83,68 @@ F-LMM/
 **Large Multimodal Models.** Models of off-the-shelf LMMs can be automatically downloaded from huggingface when running
 training or evaluation.
 
-## License
-This project is licensed under [NTU S-Lab License 1.0](LICENSE).
 
 
 ## Run
 
 ### Train
 
+```shell
+export PYTHONPATH=.
+NPROC_PER_NODE=8 xtuner train configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py --deepspeed deepspeed_zero2
+```
 
-Currently, there are bugs when using deepspeed-zero3, we are going to resolve this issue in the future.
+Currently, there are bugs when deepspeed_zero3 is used, we are going to resolve this issue in the future.
 
 ### Test
 The checkpoints of our trained models are as follows.
 **Checkpoints.**
 
+| #  |          LMM         |                                                            Configs                                                             |                                         Checkpoints                                         |
+|:--:|:---------------------:|:------------------------------------------------------------------------------------------------------------------------------:|:-------------------------------------------------------------------------------------------:|
+| 1  |     LLaVA-1.5-7B          |    [frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png](configs/llava/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.py)     | [model](https://drive.google.com/file/d/1Nz1xH7cbR8HEW40rMtYUn3PE5ypLw5vb/view?usp=sharing) |
+| 2  | LLaVA-Next-Vicuna-7B      |                       [frozen_llava_next_vicuna_7b_unet_sam_l_refcoco_png](configs/llava_next/frozen_llava_next_vicuna_7b_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1Tf8gJWmbRnsX8verC6Ee7lK3Dm781p5M/view?usp=sharing) |
+| 3  | LLaVA-Next-Mistral-7B      |                      [frozen_llava_next_mistral_7b_unet_sam_l_refcoco_png](configs/llava_next/frozen_llava_next_mistral_7b_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1lfaSAenNpfE1Smiv2WIdj0y4Mcb3NrP7/view?usp=sharing) |
+| 4  |    DeepSeekVL-1.3B         |                      [frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png](configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py)                      | [model](https://drive.google.com/file/d/1vycKoimE2-QHjzQFCXMc4YH-tfJq-GMT/view?usp=sharing) |
+| 5  |     DeepSeekVL-7B         |                       [frozen_deepseek_vl_7b_chat_unet_sam_l_refcoco_png](configs/deepseek_vl/frozen_deepseek_vl_7b_chat_unet_sam_l_refcoco_png.py)                       | [model](https://drive.google.com/file/d/1UQ3YpYeoXs4ESruUqrpWE4VwOD5UHp-S/view?usp=sharing) |
+| 6  |     MiniGemini-2B       |                              [frozen_mgm_gemma_2b_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_gemma_2b_unet_sam_l_refcoco_png.py)                               | [model](https://drive.google.com/file/d/1unxcWfzNQfyPj_PYtgtr8prne63l80eh/view?usp=sharing) |
+| 7  |     MiniGemini-7B       |                              [frozen_mgm_vicuna_7b_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_vicuna_7b_unet_sam_l_refcoco_png.py)                              | [model](https://drive.google.com/file/d/1-yfrMVaS4aN5uZSYCTalhJ_Pq3j_2aT4/view?usp=sharing) |
+| 8  |   MiniGemini-HD-7B      |                            [frozen_mgm_vicuna_7b_hd_unet_sam_l_refcoco_png](configs/mgm/frozen_mgm_vicuna_7b_hd_unet_sam_l_refcoco_png.py)                             | [model](https://drive.google.com/file/d/1_bQMw-R0tBgvFWAAJFi7RbAHN4-OYIz0/view?usp=sharing) |
+| 9  |        HPT-Air           |                                 [frozen_hpt_air_unet_sam_l_refcoco_png](configs/hpt/frozen_hpt_air_unet_sam_l_refcoco_png.py)                                 | [model](https://drive.google.com/file/d/1-yfrMVaS4aN5uZSYCTalhJ_Pq3j_2aT4/view?usp=sharing) |
+| 10 |      HPT-Air-1.5          |                               [frozen_hpt_air_1_5_unet_sam_l_refcoco_png](configs/hpt/frozen_hpt_air_1_5_unet_sam_l_refcoco_png.py)                               | [model](https://drive.google.com/file/d/1_bQMw-R0tBgvFWAAJFi7RbAHN4-OYIz0/view?usp=sharing) |
+
+
 **Panoptic Narrative Grounding (PNG).**
 ```shell
 export PYTHONPATH=.
-accelerate launch tools/multiprocess_eval_png.py \
- configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_lite_sam_l_refcoco_png.py \
-  --checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_lite_sam_l_refcoco_png/iter_95080.pth
+accelerate launch scripts/multiprocess_eval_png.py \
+ configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
+  --checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth
 ```
 **Referring Expression Segmentation (RES).**
+```shell
+export PYTHONPATH=.
+accelerate launch scripts/multiprocess_eval_refcoco.py \
+ configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
+  --checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth --concat
+```
+**Visual Chain-of-Thought Reasoning.** For now we only implement VisCot on DeepSeekVL models that work well with 
+multi-image inputs. 
 
-**Visual Chain-of-Thought Reasoning**
+***1. Inference.*** 
+```shell
+export PYTHONPATH=.
+accelerate launch scripts/visual_cot/visual_cot_inference.py configs/deepseek_vl/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.py \
+--checkpoint work_dirs/frozen_deepseek_vl_1_3b_chat_unet_sam_l_refcoco_png.pth \ 
+--version v1 --save_folder the/directory/of/result/json/files  --discard_sam
+```
 
-## Acknowledgement
-
-This project is impossible without the open-source efforts of large multimodal models in the community, including 
-LLaVA, DeepSeek-VL, MiniGemini and HPT. In addition, we also thank open-source code bases from transformers and mmengine
-teams that facilitate the development of this project.
+***2. Evaluate using ChatGPT.***
+```shell
+export OPENAI_API_KEY="your_openai_api_key"
+python scripts/visual_cot/gpt_eval_cot_score_single.py --result_file a/single/json/file  # evaluate a single json file
+python scripts/visual_cot/gpt_eval_cot_score.py --result_dir the/directory/of/all/json/files  # evaluate all json files
+```
 
 
 ## Citation
@@ -128,3 +159,13 @@ teams that facilitate the development of this project.
       primaryClass={cs.CV}
 }
 ```
+
+## License
+This project is licensed under [NTU S-Lab License 1.0](LICENSE).
+
+## Acknowledgement
+
+This project is impossible without the open-source efforts of large multimodal models in the community, including 
+LLaVA, DeepSeek-VL, MiniGemini and HPT. In addition, we also thank open-source code bases from transformers and mmengine
+teams that facilitate the development of this project.
+
