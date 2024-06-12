@@ -6,7 +6,7 @@ This is the official release of paper **F-LMM: Grounding Frozen Large Multimodal
 It is currently under construction.
 
 > [**F-LMM: Grounding Frozen Large Multimodal Models**](https://arxiv.org/abs/2406.05821),            
-> Size Wu, Wenwei Zhang, Lumin Xu, Sheng Jin, Wentao Liu, Wei Li, Chen Change Loy            
+> Size Wu, Sheng Jin, Wenwei Zhang, Lumin Xu, Wentao Liu, Wei Li, Chen Change Loy            
 > [Bibtex](https://github.com/wusize/F-LMM#citation)
 
 ## TODO
