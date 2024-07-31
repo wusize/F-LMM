@@ -24,12 +24,12 @@ from mmdet.datasets.transforms import LoadAnnotations
 #######################################################################
 
 # Scheduler & Optimizer
-batch_size = 1  # per_device
+batch_size = 2  # per_device
 accumulative_counts = 1
 dataloader_num_workers = 0
 max_epochs = 8
 optim_type = AdamW
-lr = 1e-4
+lr = 2e-4
 betas = (0.9, 0.999)
 weight_decay = 0.01
 max_norm = 1  # grad clip
@@ -110,11 +110,12 @@ model = dict(
 #                      PART 3  Dataset & Dataloader                   #
 #######################################################################
 image_token = '<image_placeholder>'
-backend_args = dict(
-    backend='petrel',
-    path_mapping=dict({
-        'data/coco/train2014/': 'openmmlab:s3://openmmlab/datasets/detection/coco/train2014/'})
-)
+# backend_args = dict(
+#     backend='petrel',
+#     path_mapping=dict({
+#         'data/coco/train2014/': 'openmmlab:s3://openmmlab/datasets/detection/coco/train2014/'})
+# )
+backend_args = None
 refcoco_pipeline = [
         dict(type=PILLoadImageFromFile, backend_args=backend_args),
         dict(
@@ -140,7 +141,7 @@ datasets_list = [
          image_processor=image_processor,
          prompt_template=prompt_template,
          local_path='data/coco/train2017',
-         ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
+         # ceph_path='openmmlab:s3://openmmlab/datasets/detection/coco/train2017',
          prompt=prompt,
          image_token=image_token),
     dict(type=RefCocoDataset,
