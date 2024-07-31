@@ -14,6 +14,7 @@ class FrozenDeepseekVL(BaseModel):
                  model,
                  tokenizer,
                  mask_head,
+                 attention_layer=-1,
                  merge='mean',
                  loss_mask=None,
                  loss_dice=None,
@@ -25,8 +26,12 @@ class FrozenDeepseekVL(BaseModel):
         self.tokenizer = BUILDER.build(tokenizer)
         self.image_token_idx = self.tokenizer.encode('<image_placeholder>', add_special_tokens=False)[-1]
         print_log(f"Image token: {self.tokenizer.decode(self.image_token_idx)}")
-        in_channels = (self.deepseek_vl.config.language_config.num_attention_heads *
-                       self.deepseek_vl.config.language_config.num_hidden_layers)
+        self.attention_layer = attention_layer
+        if attention_layer < 0:
+            in_channels = (self.deepseek_vl.config.language_config.num_attention_heads *
+                           self.deepseek_vl.config.language_config.num_hidden_layers)
+        else:
+            in_channels = self.deepseek_vl.config.language_config.num_attention_heads
         mask_head.update(in_channels=in_channels)
         self.mask_head = BUILDER.build(mask_head)
         self.merge = merge
@@ -82,13 +87,19 @@ class FrozenDeepseekVL(BaseModel):
 
 
 class FrozenDeepseekVLSAM(FrozenDeepseekVL):
-    def __init__(self, sam, *args, **kwargs):
+    def __init__(self, sam, text_layer=-1, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.sam = BUILDER.build(sam)
         self.text_proj = nn.Linear(self.deepseek_vl.config.language_config.hidden_size,
                                    self.sam.model.prompt_encoder.embed_dim)
-        self.text_layer_weights = nn.Parameter(
-            torch.ones(self.deepseek_vl.config.language_config.num_hidden_layers))
+        if text_layer < 0:
+            self.text_layer_weights = nn.Parameter(
+                torch.ones(self.deepseek_vl.config.language_config.num_hidden_layers))
+        else:
+            text_layer_weights = torch.full((self.deepseek_vl.config.language_config.num_hidden_layers, ),
+                                            torch.finfo(self.deepseek_vl.dtype).min)
+            text_layer_weights[text_layer] = torch.finfo(self.deepseek_vl.dtype).max
+            self.register_buffer('text_layer_weights', text_layer_weights, persistent=False)
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
@@ -133,11 +144,17 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         for mask_id in range(len(masks)):
             matched = mask_ids == mask_id
             assert matched.sum() > 0
-            mask_attentions.append(
-                torch.cat(
-                    [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]
+            if self.attention_layer < 0:
+                mask_attentions.append(
+                    torch.cat(
+                        [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]
+                    )
                 )
-            )
+            else:
+                attn = attentions[self.attention_layer]
+                mask_attentions.append(
+                    self.apply_merge(attn[:, matched], dim=1)
+                )
             text_embeds.append(self.text_proj(hidden_states[matched]))
         del attentions
         mask_attentions = torch.stack(mask_attentions).to(self.mask_head.dtype)
