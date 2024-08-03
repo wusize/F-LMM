@@ -22,12 +22,12 @@ def intersectionAndUnionGPU(output, target, K, ignore_index=255):
     target = target.view(-1)
     output[target == ignore_index] = ignore_index
     intersection = output[output == target]
-    import pdb; pdb.set_trace()
+    # import pdb; pdb.set_trace()
     area_intersection = torch.histc(intersection, bins=K, min=0, max=K - 1)
     area_output = torch.histc(output, bins=K, min=0, max=K - 1)
     area_target = torch.histc(target, bins=K, min=0, max=K - 1)
     area_union = area_output + area_target - area_intersection
-    return area_intersection, area_union, area_target
+    return area_intersection[1], area_union[1], area_target[1]
 
 
 def get_mask_from_json(json_path, height, width):
@@ -151,7 +151,7 @@ if __name__ == '__main__':
             intersection, union, _ = intersectionAndUnionGPU(
                 mask.clone().long(), torch.from_numpy(gt_mask).to(mask).long(), 2, ignore_index=255
             )
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
             results.append(torch.tensor([intersection.item(), union.item()]))
 
         results = gather_object(results)
