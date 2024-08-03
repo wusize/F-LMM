@@ -332,5 +332,4 @@ class FrozenLlavaSAM(FrozenLlava):
         answer = self.tokenizer.decode(outputs.sequences[0, image_to_overwrite.shape[1]:],
                                        skip_special_tokens=True)
 
-
         return answer, sam_pred_masks[0] > 0
