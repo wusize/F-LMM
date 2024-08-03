@@ -139,6 +139,7 @@ if __name__ == '__main__':
 
             gt_mask, instruction, is_sentence = get_mask_from_json(json_file, height=image.height,
                                                                    width=image.width)
+            import pdb; pdb.set_trace()
 
             if not is_sentence:
                 instruction = f"What is {instruction} in this image? "
