@@ -609,70 +609,136 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         return pred_masks, sam_pred_masks
 
-    @torch.no_grad()
-    def reason_seg(self, image, instruction, answer_prefix=None):
-        # v1: let the llm first describe the most relevant object
-        assert self._generation_ready
-        # 1. Round one: prompt the llm to find the most relevant object
-        prompt = self.prompt_template['INSTRUCTION'].format(input='<image_placeholder>' + instruction)
-        if answer_prefix is not None:
-            prompt += answer_prefix
-        assert prompt.count('<image_placeholder>') == 1
-        prompt = prompt.replace('<image_placeholder>', '<image_placeholder>' * 576)
+    # @torch.no_grad()
+    # def reason_seg(self, image, instruction, answer_prefix=None):
+    #     # v1: let the llm first describe the most relevant object
+    #     assert self._generation_ready
+    #     # 1. Round one: prompt the llm to find the most relevant object
+    #     prompt = self.prompt_template['INSTRUCTION'].format(input='<image_placeholder>' + instruction)
+    #     if answer_prefix is not None:
+    #         prompt += answer_prefix
+    #     assert prompt.count('<image_placeholder>') == 1
+    #     prompt = prompt.replace('<image_placeholder>', '<image_placeholder>' * 576)
+    #
+    #     input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
+    #     image_data = self.image_processor.preprocess(image)
+    #     pixel_values = image_data['pixel_values'][0]
+    #     pixel_values = torch.from_numpy(pixel_values)
+    #     pixel_values = pixel_values[None, None].to(
+    #         device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
+    #     images_seq_mask = input_ids == self.image_token_idx
+    #     assert images_seq_mask.sum() == 576
+    #     images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
+    #                                  device=self.deepseek_vl.device)
+    #     inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
+    #         input_ids=input_ids,
+    #         pixel_values=pixel_values,
+    #         images_seq_mask=images_seq_mask,
+    #         images_emb_mask=images_emb_mask)
+    #     outputs = self.deepseek_vl.language_model.generate(
+    #         inputs_embeds=inputs_embeds,
+    #         attention_mask=torch.ones_like(input_ids),
+    #         pad_token_id=self.tokenizer.eos_token_id,
+    #         eos_token_id=self.tokenizer.eos_token_id,
+    #         max_new_tokens=self.max_new_tokens,
+    #         stopping_criteria=self.stop_criteria,
+    #         output_hidden_states=True,
+    #         output_attentions=True,
+    #         do_sample=False,
+    #         use_cache=True,
+    #         return_dict_in_generate=True,
+    #     )
+    #     output_ids = outputs.sequences[0, :-1]    # discard the last one
+    #     answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+    #     past_key_values = outputs.past_key_values
+    #     assert len(output_ids) + inputs_embeds.shape[1] == past_key_values[0][0].shape[2]
+    #     attentions = outputs.attentions[1:]
+    #     hidden_states = outputs.hidden_states[1:]
+    #     assert len(output_ids) == len(attentions)
+    #     assert len(output_ids) == len(hidden_states)
+    #
+    #     # 2. locate the object
+    #     images_seq_indices = torch.where(images_seq_mask[0])[0]
+    #     attentions = [torch.cat([attn[layer_id][0, ..., images_seq_indices] for attn in attentions], dim=-2)
+    #                   for layer_id in range(self.deepseek_vl.language_model.config.num_hidden_layers)]
+    #     attentions = [attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape) for attn in attentions]
+    #     # num_layers, (num_heads, seq_len, h, w)
+    #     text_layer_weights = self.get_text_layer_weights()
+    #     hidden_states = torch.stack(
+    #         [torch.cat([hs[layer_id+1][0] for hs in hidden_states], dim=-2)
+    #          for layer_id in range(self.deepseek_vl.language_model.config.num_hidden_layers)
+    #          ])   # num_layers, seq_len, dim
+    #     hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+    #
+    #     mask_attentions = torch.cat([self.apply_merge(attn, dim=1)
+    #                                  for attn in attentions])[None].to(self.mask_head.dtype)
+    #     text_embeds = self.text_proj(hidden_states)[None]
+    #
+    #     pred_masks = self.mask_head(mask_attentions)[:, 0]
+    #     # todo: unpad pred_masks
+    #     meta_data = image_data['meta_datas'][0]
+    #     padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
+    #     padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+    #     before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
+    #     before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
+    #
+    #     mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
+    #     mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
+    #     pred_masks \
+    #         = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+    #     pred_masks = F.interpolate(pred_masks[None].float(), size=(image.height, image.width),
+    #                                mode='bilinear')[0].to(pred_masks)
+    #
+    #     pred_mask = self.sam(image, pred_masks, text_embeds)
+    #
+    #     return answer, pred_mask[0] > 0
 
+    @torch.no_grad()
+    def reason_seg(self, image, instruction, *args, **kwargs):
+        # v2: directly ground the whole question
+        assert self._generation_ready
+        prompt = self.prompt_template['INSTRUCTION'].format(
+            input='<image_placeholder>' * 576 + instruction + '<image_placeholder>')  # temporarily insert this special token to locate the question
         input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
+        image_places = torch.where(input_ids[0] == self.image_token_idx)[0]
+        question_start_place = image_places[-2] + 1
+        question_end_place = image_places[-1]
+
+        # 1. locate the question
+        cur_input_ids = input_ids[:, :question_end_place]
         image_data = self.image_processor.preprocess(image)
         pixel_values = image_data['pixel_values'][0]
         pixel_values = torch.from_numpy(pixel_values)
         pixel_values = pixel_values[None, None].to(
             device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
-        images_seq_mask = input_ids == self.image_token_idx
+        images_seq_mask = cur_input_ids == self.image_token_idx
         assert images_seq_mask.sum() == 576
         images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
                                      device=self.deepseek_vl.device)
         inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
-            input_ids=input_ids,
+            input_ids=cur_input_ids,
             pixel_values=pixel_values,
             images_seq_mask=images_seq_mask,
             images_emb_mask=images_emb_mask)
-        outputs = self.deepseek_vl.language_model.generate(
+        outputs = self.deepseek_vl.language_model(
             inputs_embeds=inputs_embeds,
-            attention_mask=torch.ones_like(input_ids),
-            pad_token_id=self.tokenizer.eos_token_id,
-            eos_token_id=self.tokenizer.eos_token_id,
-            max_new_tokens=self.max_new_tokens,
-            stopping_criteria=self.stop_criteria,
             output_hidden_states=True,
             output_attentions=True,
-            do_sample=False,
-            use_cache=True,
-            return_dict_in_generate=True,
-        )
-        output_ids = outputs.sequences[0, :-1]    # discard the last one
-        answer = self.tokenizer.decode(output_ids, skip_special_tokens=True)
+            return_dict=True,
+            use_cache=True)
         past_key_values = outputs.past_key_values
-        assert len(output_ids) + inputs_embeds.shape[1] == past_key_values[0][0].shape[2]
-        attentions = outputs.attentions[1:]
-        hidden_states = outputs.hidden_states[1:]
-        assert len(output_ids) == len(attentions)
-        assert len(output_ids) == len(hidden_states)
 
-        # 2. locate the object
-        images_seq_indices = torch.where(images_seq_mask[0])[0]
-        attentions = [torch.cat([attn[layer_id][0, ..., images_seq_indices] for attn in attentions], dim=-2)
-                      for layer_id in range(self.deepseek_vl.language_model.config.num_hidden_layers)]
-        attentions = [attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape) for attn in attentions]
-        # num_layers, (num_heads, seq_len, h, w)
         text_layer_weights = self.get_text_layer_weights()
-        hidden_states = torch.stack(
-            [torch.cat([hs[layer_id+1][0] for hs in hidden_states], dim=-2)
-             for layer_id in range(self.deepseek_vl.language_model.config.num_hidden_layers)
-             ])   # num_layers, seq_len, dim
+        attentions = [attn[0, ..., images_seq_mask[0]] for attn in outputs.attentions]
+        attentions = [attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape) for attn in attentions]
+        hidden_states = outputs.hidden_states[-self.deepseek_vl.config.language_config.num_hidden_layers:]
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
         hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
 
-        mask_attentions = torch.cat([self.apply_merge(attn, dim=1)
-                                     for attn in attentions])[None].to(self.mask_head.dtype)
-        text_embeds = self.text_proj(hidden_states)[None]
+        text_embeds = self.text_proj(hidden_states[question_start_place:])[None]
+        mask_attentions = torch.cat(
+            [self.apply_merge(attn[:, question_start_place:], dim=1) for attn in attentions]
+        )[None].to(self.mask_head.dtype)
 
         pred_masks = self.mask_head(mask_attentions)[:, 0]
         # todo: unpad pred_masks
@@ -688,10 +754,9 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
         pred_masks = F.interpolate(pred_masks[None].float(), size=(image.height, image.width),
                                    mode='bilinear')[0].to(pred_masks)
-
         pred_mask = self.sam(image, pred_masks, text_embeds)
 
-        return answer, pred_mask[0] > 0
+        return '', pred_mask[0] > 0
 
 
 if __name__ == '__main__':
