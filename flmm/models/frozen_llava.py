@@ -5,6 +5,8 @@ from xtuner.registry import BUILDER
 from mmengine.model import BaseModel
 from xtuner.model.utils import guess_load_checkpoint
 from flmm.utils import compute_mask_IoU
+from xtuner.utils import DEFAULT_IMAGE_TOKEN, StopWordStoppingCriteria
+from transformers import StoppingCriteriaList
 
 
 class FrozenLlava(BaseModel):
@@ -215,3 +217,82 @@ class FrozenLlavaSAM(FrozenLlava):
                      }
 
         return loss_dict
+
+    def _prepare_for_generation(self,
+                                image_processor,
+                                tokenizer,
+                                prompt_template,
+                                max_new_tokens=16,
+                                **kwargs):
+
+        if isinstance(tokenizer, dict):
+            self.tokenizer = BUILDER.build(tokenizer)
+        else:
+            self.tokenizer = tokenizer
+        if isinstance(image_processor, dict):
+            self.image_processor = BUILDER.build(image_processor)
+        else:
+            self.image_processor = image_processor
+
+        self.prompt_template = prompt_template
+        self.max_new_tokens = max_new_tokens
+
+        stop_words = self.prompt_template.get('STOP_WORDS', [])
+        self.stop_criteria = StoppingCriteriaList()
+        self.stop_word_ids = [self.tokenizer.encode(word, add_special_tokens=False)[-1]
+                              for word in stop_words]
+        for word in stop_words:
+            self.stop_criteria.append(
+                StopWordStoppingCriteria(self.tokenizer, word))
+        self._generation_ready = True
+        self.config = self.llava.config
+
+    def reason_seg(self, image, instruction, answer_prefix=None):
+        image_data = self.image_processor.preprocess(image)
+        pixel_values = image_data['pixel_values'][0]
+        meta_data = image_data['meta_datas'][0]
+        prompt = self.prompt_template['INSTRUCTION'].format(
+            input=DEFAULT_IMAGE_TOKEN + '\n' + instruction)
+        if answer_prefix is not None:
+            prompt += answer_prefix
+
+        inputs = self.tokenizer(prompt, return_tensors='pt').to(self.llava.device)
+        pixel_values = torch.from_numpy(pixel_values)[None].to(device=self.llava.device,
+                                                               dtype=self.llava.dtype)
+
+        with torch.inference_mode():
+            outputs = self.llava(**inputs,
+                                 pixel_values=pixel_values,
+                                 use_cache=True,
+                                 return_dict=True)
+
+        import pdb; pdb.set_trace()
+        past_key_values = outputs.past_key_values
+        image_to_overwrite = outputs.image_to_overwrite
+        start_id = outputs.logits[0, -1].argmax()
+        attention_mask = inputs.attention_mask
+        attention_mask = torch.cat(
+            [attention_mask, attention_mask.new_ones((attention_mask.shape[0], 1))], dim=-1
+        )
+
+        with torch.inference_mode():
+            outputs = self.llava.language_model.generate(
+                input_ids=start_id.view(1, 1),
+                past_key_values=past_key_values,
+                attention_mask=attention_mask,
+                use_cache=True,
+                return_dict_in_generate=True,
+                do_sample=False,
+                max_new_tokens=self.max_new_tokens,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id
+                if self.tokenizer.pad_token_id is not None else
+                self.tokenizer.eos_token_id,
+                stopping_criteria=self.stop_criteria
+            )
+
+        attentions = outputs.attentions
+        hidden_states = outputs.hidden_states
+
+        import pdb; pdb.set_trace()
+
