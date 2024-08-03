@@ -610,12 +610,13 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         return pred_masks, sam_pred_masks
 
     @torch.no_grad()
-    def reason_seg(self, image, instruction, *args, **kwargs):
+    def reason_seg(self, image, instruction, answer_prefix=None):
         # v1: let the llm first describe the most relevant object
         assert self._generation_ready
         # 1. Round one: prompt the llm to find the most relevant object
         prompt = self.prompt_template['INSTRUCTION'].format(input='<image_placeholder>' + instruction)
-        prompt += ' The object most relevant to the question is'
+        if answer_prefix is not None:
+            prompt += answer_prefix
         assert prompt.count('<image_placeholder>') == 1
         prompt = prompt.replace('<image_placeholder>', '<image_placeholder>' * 576)
 
