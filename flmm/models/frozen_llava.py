@@ -269,9 +269,9 @@ class FrozenLlavaSAM(FrozenLlava):
         import pdb; pdb.set_trace()
         past_key_values = outputs.past_key_values
         image_to_overwrite = outputs.image_to_overwrite
-        input_ids = inputs.input_ids
-        input_ids = torch.cat([input_ids, outputs.logits[0, -1].argmax().view(1, 1)], dim=1)
-        attention_mask = torch.ones_like(input_ids).bool()
+        input_ids = outputs.logits[0, -1].argmax().view(1, 1)
+        attention_mask = torch.ones(1, image_to_overwrite.shape[1]+1, device=self.llava.device,
+                                    dtype=torch.bool)
 
         with torch.inference_mode():
             outputs = self.llava.language_model.generate(
