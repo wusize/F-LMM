@@ -285,6 +285,10 @@ class FrozenLlavaSAM(FrozenLlava):
         input_ids = outputs.logits[0, -1].argmax().view(1, 1)
         attention_mask = torch.ones(1, image_to_overwrite.shape[1]+1, device=self.llava.device,
                                     dtype=torch.bool)
+        input_ids = torch.cat([
+            torch.ones(1, image_to_overwrite.shape[1], device=self.llava.device, dtype=torch.long),
+            input_ids
+        ], dim=1)
 
         with torch.inference_mode():
             outputs = self.llava.language_model.generate(
