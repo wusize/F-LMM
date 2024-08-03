@@ -148,7 +148,7 @@ if __name__ == '__main__':
             answer, mask = model.reason_seg(image=image, instruction=instruction,
                                             answer_prefix='It is')
             intersection, union, _ = intersectionAndUnionGPU(
-                mask.clone(), torch.from_numpy(gt_mask).to(mask), 2, ignore_index=255
+                mask.clone().to(torch.uint8), torch.from_numpy(gt_mask).to(mask), 2, ignore_index=255
             )
             results.append(torch.tensor([intersection.item(), union.item()]))
 

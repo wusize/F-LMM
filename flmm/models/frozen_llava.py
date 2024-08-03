@@ -296,7 +296,7 @@ class FrozenLlavaSAM(FrozenLlava):
                 output_attentions=True,
                 output_hidden_states=True,
             )
-        import pdb; pdb.set_trace()
+
         num_hidden_layers = self.llava.config.text_config.num_hidden_layers
         image_places = torch.where(image_to_overwrite[0])[0]
         attentions = outputs.attentions   # cur_seq_len, num_layers, (1, num_heads, 1, past_seq_len)
@@ -330,6 +330,6 @@ class FrozenLlavaSAM(FrozenLlava):
         sam_pred_masks = self.sam(image, pred_masks, [self.text_proj(hidden_states)])
         answer = self.tokenizer.decode(outputs.sequences[0, image_to_overwrite.shape[1]:],
                                        skip_special_tokens=True)
-        import pdb; pdb.set_trace()
+
 
         return answer, sam_pred_masks[0] > 0
