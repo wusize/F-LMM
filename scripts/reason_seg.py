@@ -150,6 +150,7 @@ if __name__ == '__main__':
             intersection, union, _ = intersectionAndUnionGPU(
                 mask.clone().to(torch.uint8), torch.from_numpy(gt_mask).to(mask.device), 2, ignore_index=255
             )
+            import pdb; pdb.set_trace()
             results.append(torch.tensor([intersection.item(), union.item()]))
 
         results = gather_object(results)
