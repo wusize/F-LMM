@@ -79,7 +79,7 @@ def get_mask_from_json(json_path, height, width):
         cv2.polylines(mask, np.array([points], dtype=np.int32), True, label_value, 1)
         cv2.fillPoly(mask, np.array([points], dtype=np.int32), label_value)
 
-    return mask, comments, is_sentence
+    return mask, comments[0], is_sentence
 
 
 def draw_mask(image, mask):
