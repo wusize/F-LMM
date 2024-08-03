@@ -139,7 +139,7 @@ if __name__ == '__main__':
 
             gt_mask, instruction, is_sentence = get_mask_from_json(json_file, height=image.height,
                                                                    width=image.width)
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
 
             if not is_sentence:
                 instruction = f"What is {instruction} in this image? "
@@ -148,7 +148,7 @@ if __name__ == '__main__':
             answer, mask = model.reason_seg(image=image, instruction=instruction,
                                             answer_prefix='It is')
             intersection, union, _ = intersectionAndUnionGPU(
-                mask.clone().to(torch.uint8), torch.from_numpy(gt_mask).to(mask), 2, ignore_index=255
+                mask.clone().to(torch.uint8), torch.from_numpy(gt_mask).to(mask.device), 2, ignore_index=255
             )
             results.append(torch.tensor([intersection.item(), union.item()]))
 
