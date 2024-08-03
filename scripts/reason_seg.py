@@ -159,7 +159,7 @@ if __name__ == '__main__':
         results = gather_object(results)
 
     if accelerator.is_main_process:
-        results = torch.stack(results)
+        results = torch.stack(results).float()
         intersections = results[:, 0]
         unions = results[:, 1]
         giou = (intersections / (unions + 1e-12)).mean()
