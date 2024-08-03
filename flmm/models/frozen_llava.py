@@ -265,6 +265,19 @@ class FrozenLlavaSAM(FrozenLlava):
                                  pixel_values=pixel_values,
                                  use_cache=True,
                                  return_dict=True)
+            ref = self.llava.generate(
+                **inputs,
+                pixel_values=pixel_values,
+                use_cache=True,
+                return_dict_in_generate=True,
+                do_sample=False,
+                max_new_tokens=self.max_new_tokens,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.pad_token_id
+                if self.tokenizer.pad_token_id is not None else
+                self.tokenizer.eos_token_id,
+                stopping_criteria=self.stop_criteria
+            )
 
         import pdb; pdb.set_trace()
         past_key_values = outputs.past_key_values

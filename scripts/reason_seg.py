@@ -93,7 +93,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint',
-                        default='ccheckpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
+                        default='checkpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
     parser.add_argument('--save_folder', default='', type=str)
     args = parser.parse_args()
     accelerator = Accelerator()
