@@ -116,8 +116,10 @@ class FrozenLlavaSAM(FrozenLlava):
                                  output_attentions=True)
         mask_ids = outputs['mask_ids'][0]
         attentions = [attn[0, ..., outputs['image_to_overwrite'][0]]
-                      for attn in outputs.attentions]
+                      for attn in outputs.attentions]   # num_layers, (1, num_heads, seq_len, seq_len)
+        # -> num_layers, (num_heads, seq_len, h*w)
         hidden_states = outputs.hidden_states[-self.llava.config.text_config.num_hidden_layers:]
+        # num_layers (1, seq_len, dim)
 
         labels = outputs.labels[0]
 
@@ -130,13 +132,14 @@ class FrozenLlavaSAM(FrozenLlava):
         llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
 
         attentions = [attn.view(*attn.shape[:-1], llava_h, llava_w) for attn in attentions]
+        # -> num_layers, (num_heads, seq_len, h, w)
         masks = data_sample['masks']
         mask_attentions = []
         text_embeds = []
         for mask_id in range(len(masks)):
             matched = mask_ids == mask_id
             assert matched.sum() > 0
-            mask_attentions.append(torch.cat(
+            mask_attentions.append(torch.cat(    # num_layers * num_heads, * , h, w)
                 [self.apply_merge(attn[:, matched], dim=1) for attn in attentions]))
             text_embeds.append(self.text_proj(hidden_states[matched]))
 
@@ -293,11 +296,40 @@ class FrozenLlavaSAM(FrozenLlava):
                 output_attentions=True,
                 output_hidden_states=True,
             )
+        import pdb; pdb.set_trace()
+        num_hidden_layers = self.llava.config.text_config.num_hidden_layers
+        image_places = torch.where(image_to_overwrite[0])[0]
+        attentions = outputs.attentions   # cur_seq_len, num_layers, (1, num_heads, 1, past_seq_len)
 
-        attentions = outputs.attentions
-        hidden_states = outputs.hidden_states
+        attentions = [torch.cat([attn[layer_id][0, ..., image_places] for attn in attentions], dim=-2)
+                      for layer_id in range(num_hidden_layers)]
+        # num_layers, (num_heads, cur_seq_len, h*w)
+        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        llava_h, llava_w = padded_h // self.patch_size, padded_w // self.patch_size
+        mask_attentions = self.apply_merge(torch.cat(attentions), dim=1).view(1, -1, llava_h, llava_w)
 
-        answer = self.tokenizer.decode(outputs.sequences[0, (image_to_overwrite.shape[1] + 1):],
+        hidden_states = outputs.hidden_states  # cur_seq_len, num_layers+1, (1, 1, dim)
+        text_layer_weights = self.get_text_layer_weights()
+
+        hidden_states = [torch.cat([h[layer_id][0] for h in hidden_states])  # cur_seq_len, dim
+                         for layer_id in range(1, 1+num_hidden_layers)]
+        hidden_states = torch.stack(hidden_states)
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
+        pred_masks = self.mask_head(mask_attentions.to(self.mask_head.dtype))[:, 0]
+        # todo: unpad pred_masks
+        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
+
+        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
+        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
+
+        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
+        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
+        pred_masks \
+            = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+        sam_pred_masks = self.sam(image, pred_masks, [hidden_states])
+        answer = self.tokenizer.decode(outputs.sequences[0, image_to_overwrite.shape[1]:],
                                        skip_special_tokens=True)
         import pdb; pdb.set_trace()
 
+        return answer, sam_pred_masks[0] > 0
