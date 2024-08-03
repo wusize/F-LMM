@@ -254,6 +254,7 @@ class FrozenLlavaSAM(FrozenLlava):
         image_data = self.image_processor.preprocess(image)
         pixel_values = image_data['pixel_values'][0]
         meta_data = image_data['meta_datas'][0]
+        import pdb; pdb.set_trace()
         prompt = self.prompt_template['INSTRUCTION'].format(
             input=DEFAULT_IMAGE_TOKEN + '\n' + instruction)
         if answer_prefix is not None:
