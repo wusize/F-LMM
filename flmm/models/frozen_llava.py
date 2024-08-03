@@ -327,7 +327,7 @@ class FrozenLlavaSAM(FrozenLlava):
         mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
         pred_masks \
             = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
-        sam_pred_masks = self.sam(image, pred_masks, [hidden_states])
+        sam_pred_masks = self.sam(image, pred_masks, [self.text_proj(hidden_states)])
         answer = self.tokenizer.decode(outputs.sequences[0, image_to_overwrite.shape[1]:],
                                        skip_special_tokens=True)
         import pdb; pdb.set_trace()
