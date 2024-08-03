@@ -149,7 +149,7 @@ if __name__ == '__main__':
             answer, mask = model.reason_seg(image=image, instruction=instruction,
                                             answer_prefix='It is')
             intersection, union, _ = intersectionAndUnionGPU(
-                mask.clone().to(torch.uint8), torch.from_numpy(gt_mask).to(mask.device), 2, ignore_index=255
+                mask.clone().long(), torch.from_numpy(gt_mask).to(mask).long(), 2, ignore_index=255
             )
             import pdb; pdb.set_trace()
             results.append(torch.tensor([intersection.item(), union.item()]))
