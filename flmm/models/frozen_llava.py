@@ -265,21 +265,7 @@ class FrozenLlavaSAM(FrozenLlava):
                                  pixel_values=pixel_values,
                                  use_cache=True,
                                  return_dict=True)
-            ref = self.llava.generate(
-                **inputs,
-                pixel_values=pixel_values,
-                use_cache=True,
-                return_dict_in_generate=True,
-                do_sample=False,
-                max_new_tokens=self.max_new_tokens,
-                eos_token_id=self.tokenizer.eos_token_id,
-                pad_token_id=self.tokenizer.pad_token_id
-                if self.tokenizer.pad_token_id is not None else
-                self.tokenizer.eos_token_id,
-                stopping_criteria=self.stop_criteria
-            )
 
-        import pdb; pdb.set_trace()
         past_key_values = outputs.past_key_values
         image_to_overwrite = outputs.image_to_overwrite
         input_ids = outputs.logits[0, -1].argmax().view(1, 1)
@@ -303,11 +289,15 @@ class FrozenLlavaSAM(FrozenLlava):
                 pad_token_id=self.tokenizer.pad_token_id
                 if self.tokenizer.pad_token_id is not None else
                 self.tokenizer.eos_token_id,
-                stopping_criteria=self.stop_criteria
+                stopping_criteria=self.stop_criteria,
+                output_attentions=True,
+                output_hidden_states=True,
             )
 
         attentions = outputs.attentions
         hidden_states = outputs.hidden_states
 
+        answer = self.tokenizer.decode(outputs.sequences[0, (image_to_overwrite.shape[1] + 1):],
+                                       skip_special_tokens=True)
         import pdb; pdb.set_trace()
 
