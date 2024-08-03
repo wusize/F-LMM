@@ -22,6 +22,7 @@ def intersectionAndUnionGPU(output, target, K, ignore_index=255):
     target = target.view(-1)
     output[target == ignore_index] = ignore_index
     intersection = output[output == target]
+    import pdb; pdb.set_trace()
     area_intersection = torch.histc(intersection, bins=K, min=0, max=K - 1)
     area_output = torch.histc(output, bins=K, min=0, max=K - 1)
     area_target = torch.histc(target, bins=K, min=0, max=K - 1)
