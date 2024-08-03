@@ -123,7 +123,8 @@ if __name__ == '__main__':
     model._prepare_for_generation(image_processor=image_processor,
                                   tokenizer=tokenizer,
                                   prompt_template=prompt_template,
-                                  max_new_tokens=16,)
+                                  max_new_tokens=16,
+                                  lmm_name=cfg.get('lmm_name', ''),)
     model = model.to(device=accelerator.device)
     model.eval()
 
