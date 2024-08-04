@@ -52,7 +52,8 @@ prompt_template = dict(
     SEP='\n',
     STOP_WORDS=['<｜end▁of▁sentence｜>']
 )
-prompt = '<image_placeholder>'*576 + "Please give me a description of the image."
+image_placeholder = '<image_placeholder>'*576
+prompt = image_placeholder + "Please give me a description of the image."
 lmm_name = deepseek_vl_name = "deepseek-ai/deepseek-vl-7b-chat"
 unet = dict(type=UNetHead,
             normalize_input=True,
