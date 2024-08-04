@@ -85,6 +85,7 @@ if __name__ == '__main__':
     hidden_states = outputs['hidden_states'][-len(object_tokens):]
     attentions = outputs['attentions'][:, -len(object_tokens):]
 
-    mask_attentions, pred_masks = model.forward_seg()
+    mask_attentions, pred_masks = model.forward_seg(
+        attentions, hidden_states, dict(image=image, meta_data=meta_data))
 
     import pdb; pdb.set_trace()
