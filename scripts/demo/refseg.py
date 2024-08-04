@@ -82,7 +82,9 @@ if __name__ == '__main__':
     outputs = model.forward_lmm(dict(pixel_values=pixel_values,
                                      input_ids=input_ids))
 
-    hidden_states = outputs['hidden_states']
-    attentions = outputs['attentions']
-    import pdb; pdb.set_trace()
+    hidden_states = outputs['hidden_states'][-len(object_tokens):]
+    attentions = outputs['attentions'][:, -len(object_tokens):]
 
+    mask_attentions, pred_masks = model.forward_seg()
+
+    import pdb; pdb.set_trace()

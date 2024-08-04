@@ -128,11 +128,41 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         attentions = [attn[0, ..., images_seq_mask[0]] for attn in outputs.attentions]
         attentions = torch.stack([attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape)
                                   for attn in attentions])
+        attentions = attentions.flatten(0, 1)
         hidden_states = outputs.hidden_states[-self.deepseek_vl.config.language_config.num_hidden_layers:]
         hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
         hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
 
         return dict(attentions=attentions, hidden_states=hidden_states)
+
+    @torch.no_grad()
+    def forward_seg(self, attentions, hidden_states, data_sample):
+        mask_attentions = self.apply_merge(attentions, dim=1)
+        text_embeds = self.text_proj(hidden_states)
+        meta_data = data_sample['meta_data']
+
+        mask_attentions = mask_attentions[None].to(self.mask_head.dtype)
+        pred_masks = self.mask_head(mask_attentions)[:, 0]
+        mask_attentions = F.interpolate(mask_attentions.float(), size=pred_masks.shape[-2:],
+                                        mode='bilinear').to(self.mask_head.dtype)
+        # todo: unpad pred_masks
+        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
+        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
+        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
+        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
+
+        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
+        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
+        pred_masks \
+            = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
+
+        mask_attentions \
+            = mask_attentions[..., before_height:before_height + mask_h,
+              before_width:before_width + mask_w].contiguous()
+
+        pred_masks = self.sam(data_sample['image'], pred_masks, [text_embeds])
+
+        return mask_attentions, pred_masks
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
