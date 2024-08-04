@@ -147,13 +147,13 @@ if __name__ == '__main__':
 
             if not is_sentence:
                 is_sentences.append(0)
-                # instruction = f"What is {instruction} in this image? "
+                instruction = f"What is {instruction} in this image? "
             else:
                 is_sentences.append(1)
 
             instruction += 'Briefly answer the question in a single sentence.'
             answer, mask = model.reason_seg(image=image, instruction=instruction,
-                                            answer_prefix='It is', is_sentence=is_sentence)
+                                            answer_prefix='It is')
             intersection, union, _ = intersectionAndUnionGPU(
                 mask.clone().long(),
                 torch.from_numpy(gt_mask).long().to(mask.device),

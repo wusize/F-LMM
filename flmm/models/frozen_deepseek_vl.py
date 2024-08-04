@@ -610,9 +610,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         return pred_masks, sam_pred_masks
 
     @torch.no_grad()
-    def reason_seg(self, image, instruction, answer_prefix=None, is_sentence=True):
-        if not is_sentence:
-            return self._reason_seg(image, instruction)
+    def reason_seg(self, image, instruction, answer_prefix=None):
         # v1: let the llm first describe the most relevant object
         assert self._generation_ready
         # 1. Round one: prompt the llm to find the most relevant object
@@ -694,71 +692,6 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         pred_mask = self.sam(image, pred_masks, text_embeds)
 
         return answer, pred_mask[0] > 0
-
-    @torch.no_grad()
-    def _reason_seg(self, image, instruction, **kwargs):
-        # v2: directly ground the whole question
-        assert self._generation_ready
-        prompt = self.prompt_template['INSTRUCTION'].format(
-            input='<image_placeholder>' * 576 + instruction + '<image_placeholder>')  # temporarily insert this special token to locate the question
-        input_ids = self.tokenizer.encode(prompt, return_tensors='pt').to(self.deepseek_vl.device)
-        image_places = torch.where(input_ids[0] == self.image_token_idx)[0]
-        question_start_place = image_places[-2] + 1
-        question_end_place = image_places[-1]
-
-        # 1. locate the question
-        cur_input_ids = input_ids[:, :question_end_place]
-        image_data = self.image_processor.preprocess(image)
-        pixel_values = image_data['pixel_values'][0]
-        pixel_values = torch.from_numpy(pixel_values)
-        pixel_values = pixel_values[None, None].to(
-            device=self.deepseek_vl.device, dtype=self.deepseek_vl.dtype)
-        images_seq_mask = cur_input_ids == self.image_token_idx
-        assert images_seq_mask.sum() == 576
-        images_emb_mask = torch.ones((1, 1, 576), dtype=torch.bool,
-                                     device=self.deepseek_vl.device)
-        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
-            input_ids=cur_input_ids,
-            pixel_values=pixel_values,
-            images_seq_mask=images_seq_mask,
-            images_emb_mask=images_emb_mask)
-        outputs = self.deepseek_vl.language_model(
-            inputs_embeds=inputs_embeds,
-            output_hidden_states=True,
-            output_attentions=True,
-            return_dict=True,
-            use_cache=True)
-        past_key_values = outputs.past_key_values
-
-        text_layer_weights = self.get_text_layer_weights()
-        attentions = [attn[0, ..., images_seq_mask[0]] for attn in outputs.attentions]
-        attentions = [attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape) for attn in attentions]
-        hidden_states = outputs.hidden_states[-self.deepseek_vl.config.language_config.num_hidden_layers:]
-        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
-        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
-
-        text_embeds = self.text_proj(hidden_states[question_start_place:])[None]
-        mask_attentions = torch.cat(
-            [self.apply_merge(attn[:, question_start_place:], dim=1) for attn in attentions]
-        )[None].to(self.mask_head.dtype)
-
-        pred_masks = self.mask_head(mask_attentions)[:, 0]
-        # todo: unpad pred_masks
-        meta_data = image_data['meta_datas'][0]
-        padded_mask_h, padded_mask_w = pred_masks.shape[-2:]
-        padded_h, padded_w = meta_data['padded_shape']['height'], meta_data['padded_shape']['width']
-        before_height = int(meta_data['padding']['before_height'] * padded_mask_h / padded_h)
-        before_width = int(meta_data['padding']['before_width'] * padded_mask_w / padded_w)
-
-        mask_h = int(meta_data['image_shape']['height'] * padded_mask_h / padded_h + 0.5)
-        mask_w = int(meta_data['image_shape']['width'] * padded_mask_w / padded_w + 0.5)
-        pred_masks \
-            = pred_masks[:, before_height:before_height + mask_h, before_width:before_width + mask_w].contiguous()
-        pred_masks = F.interpolate(pred_masks[None].float(), size=(image.height, image.width),
-                                   mode='bilinear')[0].to(pred_masks)
-        pred_mask = self.sam(image, pred_masks, text_embeds)
-
-        return '', pred_mask[0] > 0
 
 
 if __name__ == '__main__':
