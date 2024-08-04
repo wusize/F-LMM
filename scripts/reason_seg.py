@@ -156,6 +156,14 @@ if __name__ == '__main__':
             )
             # import pdb; pdb.set_trace()
             results.append(torch.tensor([intersection.item(), union.item()]))
+            json_file = os.path.basename(json_file)
+            image_file = os.path.basename(image_file)
+            with open(os.path.join(args.save_folder, json_file), 'w') as f:
+                json.dump(obj=dict(answer=answer), fp=f)
+
+            mask = mask.detach().cpu().numpy()
+            image = draw_mask(image, mask)
+            image.save(fp=os.path.join(args.save_folder, image_file))
 
         results = gather_object(results)
 
