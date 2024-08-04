@@ -136,7 +136,7 @@ if __name__ == '__main__':
 
     data_ids = list(range(len(png_dataset)))
     if args.debug:
-        data_ids = data_ids[::100]
+        data_ids = data_ids[:50]
     if args.output is not None:
         os.makedirs(args.output, exist_ok=True)
 
