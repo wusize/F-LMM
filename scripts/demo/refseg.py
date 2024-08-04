@@ -107,7 +107,6 @@ if __name__ == '__main__':
 
     mask_attentions, pred_mask = model.forward_seg(
         attentions, hidden_states, dict(image=image, meta_data=meta_data))
-    attn_mask = do_kmeans(mask_attentions.float(), pred_mask > 0.0)
-    pred_mask = pred_mask.detach().cpu().numpy() > 0
-    draw_mask(image, pred_mask).save(args.output)
+    attn_mask = do_kmeans(mask_attentions.float(), pred_mask.detach().cpu() > 0.0)
+    draw_mask(image, pred_mask.detach().cpu().numpy() > 0).save(args.output)
     draw_mask(image, attn_mask.numpy()).save(args.output.replace('.jpg', '_attn.jpg'))
