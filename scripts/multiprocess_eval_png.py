@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -10,8 +12,18 @@ from xtuner.model.utils import guess_load_checkpoint
 from accelerate import Accelerator
 from accelerate.utils import gather_object
 from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN
+from PIL import Image
+from scripts.demo.utils import colors
 
 accelerator = Accelerator()
+
+
+def draw_mask(image, mask, c=(255, 0, 0)):
+    image = np.array(image.convert('RGB')).astype(np.float32)
+    image[mask] = image[mask] * 0.5 + np.array(c, dtype=np.float32).reshape(1, 1, 3) * 0.5
+    image = image.astype(np.uint8)
+
+    return Image.fromarray(image)
 
 
 def average_accuracy(ious):
@@ -70,6 +82,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--output', default=None, type=str)
     parser.add_argument('--debug', action='store_true')
     args = parser.parse_args()
 
@@ -122,7 +135,9 @@ if __name__ == '__main__':
 
     data_ids = list(range(len(png_dataset)))
     if args.debug:
-        data_ids = data_ids[:100]
+        data_ids = data_ids[::100]
+    if args.output is not None:
+        os.makedirs(args.output, exist_ok=True)
 
     # divide the prompt list onto the available GPUs
     with accelerator.split_between_processes(data_ids) as sub_ids:
@@ -140,6 +155,7 @@ if __name__ == '__main__':
 
             assert pred_masks.shape == gt_masks.shape
             mask_cnt = pred_masks.shape[0]
+            import pdb; pdb.set_trace()
 
             mask_infos = data_sample['mask_infos']
             sub_mask_ious = [compute_mask_IoU(pred_masks.flatten(1, 2), gt_masks.flatten(1, 2))[-1]]

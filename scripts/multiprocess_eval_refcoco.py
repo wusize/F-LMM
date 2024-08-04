@@ -163,7 +163,7 @@ if __name__ == '__main__':
                     assert len(pred_masks) == len(gt_masks)
                     mask_cnt = pred_masks.shape[0]
 
-                    import pdb; pdb.set_trace()
+                    # import pdb; pdb.set_trace()
 
                     # Formulate the output into the format that the evaluator accepts
                     results.append(dict(pred_instances=dict(masks=pred_masks),
