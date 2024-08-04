@@ -1,3 +1,5 @@
+import random
+
 import torch
 import argparse
 import json
@@ -79,7 +81,7 @@ def get_mask_from_json(json_path, height, width):
         cv2.polylines(mask, np.array([points], dtype=np.int32), True, label_value, 1)
         cv2.fillPoly(mask, np.array([points], dtype=np.int32), label_value)
 
-    return mask, comments[0], is_sentence
+    return mask, comments, is_sentence
 
 
 def draw_mask(image, mask):
@@ -93,6 +95,7 @@ def draw_mask(image, mask):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
+    parser.add_argument('--random', action='store_true')
     parser.add_argument('--data', default='data/ReasonSeg/val', type=str)
     parser.add_argument('--checkpoint',
                         default='checkpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
@@ -141,8 +144,9 @@ if __name__ == '__main__':
             image_file = json_file.replace('.json', '.jpg')
             image = Image.open(image_file).convert('RGB')
 
-            gt_mask, instruction, is_sentence = get_mask_from_json(json_file, height=image.height,
+            gt_mask, instructions, is_sentence = get_mask_from_json(json_file, height=image.height,
                                                                    width=image.width)
+            instruction = random.choice(instructions) if args.random else instructions[0]
             # import pdb; pdb.set_trace()
 
             if not is_sentence:
