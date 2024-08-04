@@ -1,3 +1,4 @@
+import json
 import os
 
 import numpy as np
@@ -155,7 +156,17 @@ if __name__ == '__main__':
 
             assert pred_masks.shape == gt_masks.shape
             mask_cnt = pred_masks.shape[0]
-            import pdb; pdb.set_trace()
+            # import pdb; pdb.set_trace()
+            meta_data = png_dataset.data[idx]
+            if args.output is not None:
+                with open(os.path.join(args.output, f"{meta_data['image_id']}.json"), 'w') as f:
+                    json.dump(fp=f, obj=meta_data)
+
+                image = data_sample['image']
+                for mask_cnt in range(pred_masks.shape[0]):
+                    image = draw_mask(image=image, mask=pred_masks[mask_cnt].numpy(),
+                                      c=colors[mask_cnt % len(colors)])
+                image.save(os.path.join(args.output, f"{meta_data['image_id']}.jpg"))
 
             mask_infos = data_sample['mask_infos']
             sub_mask_ious = [compute_mask_IoU(pred_masks.flatten(1, 2), gt_masks.flatten(1, 2))[-1]]
