@@ -101,6 +101,31 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             text_layer_weights[text_layer] = torch.finfo(self.deepseek_vl.dtype).max
             self.register_buffer('text_layer_weights', text_layer_weights, persistent=False)
 
+    def forward_lmm(self, data_sample):
+        pixel_values = data_sample['pixel_values'][None, None].to(
+            device=self.deepseek_vl.device,
+            dtype=self.deepseek_vl.dtype)
+        input_ids = data_sample['input_ids'][None].to(self.deepseek_vl.device)
+        images_seq_mask = input_ids == self.image_token_idx
+        images_emb_mask = torch.ones((1, 1, images_seq_mask.sum()), dtype=torch.bool,
+                                     device=self.deepseek_vl.device)
+
+        inputs_embeds = self.deepseek_vl.prepare_inputs_embeds(
+            input_ids=input_ids,
+            pixel_values=pixel_values,
+            images_seq_mask=images_seq_mask,
+            images_emb_mask=images_emb_mask)
+
+        with torch.inference_mode():
+            outputs = self.deepseek_vl.language_model(
+                inputs_embeds=inputs_embeds,
+                output_hidden_states=True,
+                output_attentions=True,
+                return_dict=True,
+                use_cache=False)
+
+        return outputs
+
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
 
