@@ -102,6 +102,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             self.register_buffer('text_layer_weights', text_layer_weights, persistent=False)
 
     def forward_lmm(self, data_sample):
+        text_layer_weights = self.get_text_layer_weights()
         pixel_values = data_sample['pixel_values'][None, None].to(
             device=self.deepseek_vl.device,
             dtype=self.deepseek_vl.dtype)
@@ -124,7 +125,14 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                 return_dict=True,
                 use_cache=False)
 
-        return outputs
+        attentions = [attn[0, ..., images_seq_mask[0]] for attn in outputs.attentions]
+        attentions = torch.stack([attn.view(*attn.shape[:-1], self.clip_shape, self.clip_shape)
+                                  for attn in attentions])
+        hidden_states = outputs.hidden_states[-self.deepseek_vl.config.language_config.num_hidden_layers:]
+        hidden_states = torch.stack([hs[0] for hs in hidden_states])  # num_layers, seq_len, dim
+        hidden_states = (hidden_states * text_layer_weights.view(-1, 1, 1)).sum(0)  # seq_len, dim
+
+        return dict(attentions=attentions, hidden_states=hidden_states)
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
