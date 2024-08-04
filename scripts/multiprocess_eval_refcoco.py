@@ -1,3 +1,5 @@
+import os
+
 from mmdet.datasets import RefCocoDataset
 from flmm.datasets.transforms import PILLoadImageFromFile, RefCOCO2PNG
 from mmdet.datasets.transforms import LoadAnnotations
@@ -15,12 +17,23 @@ from tqdm import tqdm
 import torch
 import torch.nn.functional as F
 from time import time
+import numpy as np
+from PIL import Image
+
+
+def draw_mask(image, mask):
+    image = np.array(image.convert('RGB')).astype(np.float32)
+    image[mask] = image[mask] * 0.5 + np.array([255, 0, 0], dtype=np.float32).reshape(1, 1, 3) * 0.5
+    image = image.astype(np.uint8)
+
+    return Image.fromarray(image)
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
     parser.add_argument('--checkpoint', default=None, type=str)
+    parser.add_argument('--output', default=None, type=str)
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--ceph', action='store_true')
     parser.add_argument('--concat', action='store_true')
@@ -116,6 +129,8 @@ if __name__ == '__main__':
             split=split)
 
     for name, subset in refcoco_subsets.items():
+        if args.output is not None:
+            os.makedirs(f"{args.output}/{subset}")
         accelerator.print(f"Start evaluating {name}")
         dataset = RefCocoDataset(
             data_root='data/coco/',
@@ -147,6 +162,8 @@ if __name__ == '__main__':
 
                     assert len(pred_masks) == len(gt_masks)
                     mask_cnt = pred_masks.shape[0]
+
+                    import pdb; pdb.set_trace()
 
                     # Formulate the output into the format that the evaluator accepts
                     results.append(dict(pred_instances=dict(masks=pred_masks),
