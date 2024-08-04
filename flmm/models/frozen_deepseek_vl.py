@@ -162,7 +162,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
 
         pred_masks = self.sam(data_sample['image'], pred_masks, [text_embeds])
 
-        return mask_attentions, pred_masks
+        return mask_attentions[0], pred_masks[0]
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)

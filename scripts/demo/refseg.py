@@ -1,15 +1,6 @@
-import random
-
 import torch
 import argparse
-import json
-import os
-import cv2
 import numpy as np
-from glob import glob
-from accelerate import Accelerator
-from tqdm import tqdm
-from accelerate.utils import gather_object
 from mmengine.config import Config
 from xtuner.registry import BUILDER
 from PIL import Image
@@ -28,10 +19,12 @@ def draw_mask(image, mask):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
-    parser.add_argument('--image', default='data/ReasonSeg/val', type=str)
+    parser.add_argument('--image', default='images/dog-and-cat-cover.jpg', type=str)
     parser.add_argument('--checkpoint',
                         default='checkpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
     parser.add_argument('--text', default='The cat next to the dog.', type=str)
+    parser.add_argument('--output', default='output.json', type=str)
+
     args = parser.parse_args()
 
     cfg = Config.fromfile(args.config)
@@ -85,7 +78,11 @@ if __name__ == '__main__':
     hidden_states = outputs['hidden_states'][-len(object_tokens):]
     attentions = outputs['attentions'][:, -len(object_tokens):]
 
-    mask_attentions, pred_masks = model.forward_seg(
+    mask_attentions, pred_mask = model.forward_seg(
         attentions, hidden_states, dict(image=image, meta_data=meta_data))
+
+    pred_mask = pred_mask.detach().cpu().numpy() > 0
+    image = draw_mask(image, pred_mask)
+    image.save(args.output)
 
     import pdb; pdb.set_trace()
