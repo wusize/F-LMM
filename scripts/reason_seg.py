@@ -27,7 +27,7 @@ def intersectionAndUnionGPU(output, target, K, ignore_index=255):
     area_output = torch.histc(output, bins=K, min=0, max=K - 1)
     area_target = torch.histc(target, bins=K, min=0, max=K - 1)
     area_union = area_output + area_target - area_intersection
-    return area_intersection[1], area_union[1], area_target[1]
+    return area_intersection[1] / len(output), area_union[1] / len(output), area_target[1] / len(output)
 
 
 def get_mask_from_json(json_path, height, width):
