@@ -93,6 +93,7 @@ def draw_mask(image, mask):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
+    parser.add_argument('--data', default='data/ReasonSeg/val', type=str)
     parser.add_argument('--checkpoint',
                         default='checkpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
     parser.add_argument('--save_folder', default='', type=str)
@@ -128,10 +129,11 @@ if __name__ == '__main__':
     model = model.to(device=accelerator.device)
     model.eval()
 
-    json_files = glob("data/ReasonSeg/val/*.json")
+    json_files = glob(f"{args.data}/*.json")
 
     data_ids = list(range(len(json_files)))
     results = []
+    is_sentences = []
 
     with accelerator.split_between_processes(data_ids) as sub_ids:
         for idx in tqdm(sub_ids, disable=not accelerator.is_main_process):
@@ -144,7 +146,10 @@ if __name__ == '__main__':
             # import pdb; pdb.set_trace()
 
             if not is_sentence:
+                is_sentences.append(0)
                 instruction = f"What is {instruction} in this image? "
+            else:
+                is_sentences.append(1)
 
             instruction += 'Briefly answer the question in a single sentence.'
             answer, mask = model.reason_seg(image=image, instruction=instruction,
@@ -166,11 +171,23 @@ if __name__ == '__main__':
             image.save(fp=os.path.join(args.save_folder, image_file))
 
         results = gather_object(results)
+        is_sentences = gather_object(is_sentences)
 
     if accelerator.is_main_process:
         results = torch.stack(results).float()
+        is_sentences = torch.tensor(is_sentences).bool()
         intersections = results[:, 0]
         unions = results[:, 1]
+
         giou = (intersections / (unions + 1e-12)).mean()
         ciou = intersections.mean() / (unions.mean() + 1e-12)
-        print(f'giou: {giou}, ciou: {ciou}', flush=True)
+        print(f'Overall: giou: {giou}, ciou: {ciou}', flush=True)
+
+        giou = (intersections / (unions + 1e-12))[is_sentences].mean()
+        ciou = intersections[is_sentences].mean() / (unions[is_sentences].mean() + 1e-12)
+        print(f'Long: giou: {giou}, ciou: {ciou}', flush=True)
+
+        giou = (intersections / (unions + 1e-12))[is_sentences.logical_not()].mean()
+        ciou = (intersections[is_sentences.logical_not()].mean()
+                / (unions[is_sentences.logical_not()].mean() + 1e-12))
+        print(f'Short: giou: {giou}, ciou: {ciou}', flush=True)
