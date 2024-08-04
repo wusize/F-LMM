@@ -24,6 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--debug', action='store_true')
     parser.add_argument('--ceph', action='store_true')
     parser.add_argument('--concat', action='store_true')
+    parser.add_argument('--random', action='store_true')
     args = parser.parse_args()
 
     ### Initialize accelerator
@@ -112,7 +113,7 @@ if __name__ == '__main__':
         dataset = RefCocoDataset(
             data_root='data/coco/',
             data_prefix=dict(img_path='train2014/'),
-            text_mode='select_first',
+            text_mode='random' if args.random else 'select_first',
             pipeline=test_pipeline,
             **subset
         )
