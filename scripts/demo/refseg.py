@@ -1,11 +1,37 @@
 import torch
+import torch.nn.functional as F
 import argparse
 import numpy as np
 from mmengine.config import Config
 from xtuner.registry import BUILDER
+from sklearn.cluster import KMeans
 from PIL import Image
 from xtuner.model.utils import guess_load_checkpoint
 from xtuner.utils.constants import DEFAULT_IMAGE_TOKEN, IMAGE_TOKEN_INDEX
+
+
+def compute_mask_IoU(masks, target):
+    temp = masks * target
+    intersection = temp.sum(dim=-1)
+    union = ((masks + target) - temp).sum(dim=-1)
+    return intersection, union, intersection / (union + 1e-12)
+
+
+def do_kmeans(feature_map, gt_mask):
+    c, h, w = feature_map.shape
+    feature_map = feature_map.view(c, h*w).T.contiguous()
+    feature_map = F.normalize(feature_map, dim=-1).cpu().numpy()
+    cluster_method = KMeans(n_clusters=2, n_init=10)
+    # fit model and predict clusters
+    results = cluster_method.fit_predict(feature_map)
+
+    mask1 = torch.from_numpy(results.reshape(h, w) == 0).float()
+    mask2 = torch.from_numpy(results.reshape(h, w) == 1).float()
+
+    masks = F.interpolate(torch.stack([mask1, mask2])[None], size=gt_mask.shape, mode='bilinear')[0]
+    ious = compute_mask_IoU(masks.view(2, -1), torch.from_numpy(gt_mask).float().view(1, -1))[-1]
+
+    return masks[ious.argmax()] > 0
 
 
 def draw_mask(image, mask):
@@ -77,12 +103,11 @@ if __name__ == '__main__':
 
     hidden_states = outputs['hidden_states'][-len(object_tokens):]
     attentions = outputs['attentions'][:, -len(object_tokens):]
+    import pdb; pdb.set_trace()
 
     mask_attentions, pred_mask = model.forward_seg(
         attentions, hidden_states, dict(image=image, meta_data=meta_data))
-
+    attn_mask = do_kmeans(mask_attentions.float(), pred_mask > 0.0)
     pred_mask = pred_mask.detach().cpu().numpy() > 0
-    image = draw_mask(image, pred_mask)
-    image.save(args.output)
-
-    import pdb; pdb.set_trace()
+    draw_mask(image, pred_mask).save(args.output)
+    draw_mask(image, attn_mask.numpy()).save(args.output.replace('.jpg', '_attn.jpg'))

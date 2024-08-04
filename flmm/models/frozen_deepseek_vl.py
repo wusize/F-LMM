@@ -161,6 +161,8 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
               before_width:before_width + mask_w].contiguous()
 
         pred_masks = self.sam(data_sample['image'], pred_masks, [text_embeds])
+        mask_attentions = F.interpolate(mask_attentions, size=pred_masks.shape[-2:],
+                                        mode='bilinear')
 
         return mask_attentions[0], pred_masks[0]
 
