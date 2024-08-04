@@ -17,7 +17,7 @@ def compute_mask_IoU(masks, target):
     return intersection, union, intersection / (union + 1e-12)
 
 
-def do_kmeans(feature_map, gt_mask):
+def do_kmeans(feature_map, ref_mask):
     c, h, w = feature_map.shape
     feature_map = feature_map.view(c, h*w).T.contiguous()
     feature_map = F.normalize(feature_map, dim=-1).cpu().numpy()
@@ -28,8 +28,8 @@ def do_kmeans(feature_map, gt_mask):
     mask1 = torch.from_numpy(results.reshape(h, w) == 0).float()
     mask2 = torch.from_numpy(results.reshape(h, w) == 1).float()
 
-    masks = F.interpolate(torch.stack([mask1, mask2])[None], size=gt_mask.shape, mode='bilinear')[0]
-    ious = compute_mask_IoU(masks.view(2, -1), torch.from_numpy(gt_mask).float().view(1, -1))[-1]
+    masks = F.interpolate(torch.stack([mask1, mask2])[None], size=ref_mask.shape, mode='bilinear')[0]
+    ious = compute_mask_IoU(masks.view(2, -1), ref_mask.float().view(1, -1))[-1]
 
     return masks[ious.argmax()] > 0
 
