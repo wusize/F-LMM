@@ -25,6 +25,7 @@ if __name__ == '__main__':
     parser.add_argument('--ceph', action='store_true')
     parser.add_argument('--concat', action='store_true')
     parser.add_argument('--random', action='store_true')
+    parser.add_argument('--val', action='store_true')
     args = parser.parse_args()
 
     ### Initialize accelerator
@@ -91,18 +92,24 @@ if __name__ == '__main__':
 
     refcoco_subsets = dict()
     for split in ['val', 'testA', 'testB']:
+        if args.val and split != 'val':
+            continue
         refcoco_subsets[f'refcoco_{split}'] = dict(
             ann_file='refcoco/instances.json',
             split_file='refcoco/refs(unc).p',
             split=split)
 
     for split in ['val', 'testA', 'testB']:
+        if args.val and split != 'val':
+            continue
         refcoco_subsets[f'refcoco+_{split}'] = dict(
             ann_file='refcoco+/instances.json',
             split_file='refcoco+/refs(unc).p',
             split=split)
 
     for split in ['val', 'test']:
+        if args.val and split != 'val':
+            continue
         refcoco_subsets[f'refcocog_{split}'] = dict(
             ann_file='refcocog/instances.json',
             split_file='refcocog/refs(umd).p',
