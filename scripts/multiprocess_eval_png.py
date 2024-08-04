@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
                 image = data_sample['image']
                 for mask_cnt in range(pred_masks.shape[0]):
-                    image = draw_mask(image=image, mask=pred_masks[mask_cnt].numpy(),
+                    image = draw_mask(image=image, mask=pred_masks[mask_cnt].numpy() > 0,
                                       c=colors[mask_cnt % len(colors)])
                 image.save(os.path.join(args.output, f"{meta_data['image_id']}.jpg"))
 
