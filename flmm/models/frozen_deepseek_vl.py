@@ -165,8 +165,12 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
                                         mode='bilinear')
         pred_masks = F.interpolate(pred_masks[None].float(), size=sam_pred_masks.shape[-2:],
                                    mode='bilinear')[0].to(pred_masks)
+        num_layers = self.deepseek_vl.config.language_config.num_hidden_layers
+        num_heads = self.deepseek_vl.config.language_config.num_attention_heads
+        mask_attentions = mask_attentions.view(num_layers, num_heads,
+                                               *mask_attentions.shape[-2:])
 
-        return mask_attentions[0], pred_masks[0], sam_pred_masks[0]
+        return mask_attentions[num_layers//2], pred_masks[0], sam_pred_masks[0]
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
