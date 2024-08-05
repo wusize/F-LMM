@@ -48,7 +48,7 @@ if __name__ == '__main__':
     parser.add_argument('--image', default='images/example.jpg', type=str)
     parser.add_argument('--checkpoint',
                         default='checkpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
-    parser.add_argument('--text', default='The cat next to the dog.', type=str)
+    parser.add_argument('--text', default='The cat left to the dog.', type=str)
     parser.add_argument('--output', default='output.jpg', type=str)
 
     args = parser.parse_args()
