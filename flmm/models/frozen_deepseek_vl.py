@@ -160,11 +160,13 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
             = mask_attentions[..., before_height:before_height + mask_h,
               before_width:before_width + mask_w].contiguous()
 
-        pred_masks = self.sam(data_sample['image'], pred_masks, [text_embeds])
-        mask_attentions = F.interpolate(mask_attentions, size=pred_masks.shape[-2:],
+        sam_pred_masks = self.sam(data_sample['image'], pred_masks, [text_embeds])
+        mask_attentions = F.interpolate(mask_attentions, size=sam_pred_masks.shape[-2:],
                                         mode='bilinear')
+        pred_masks = F.interpolate(pred_masks[None].float(), size=sam_pred_masks.shape[-2:],
+                                   mode='bilinear')[0].to(pred_masks)
 
-        return mask_attentions[0], pred_masks[0]
+        return mask_attentions[0], pred_masks[0], sam_pred_masks[0]
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
