@@ -105,8 +105,9 @@ if __name__ == '__main__':
     attentions = outputs['attentions'][:, -len(object_tokens):]
     import pdb; pdb.set_trace()
 
-    mask_attentions, pred_mask = model.forward_seg(
+    mask_attentions, cnn_pred_masks, sam_pred_masks = model.forward_seg(
         attentions, hidden_states, dict(image=image, meta_data=meta_data))
-    attn_mask = do_kmeans(mask_attentions.float(), pred_mask.detach().cpu() > 0.0)
-    draw_mask(image, pred_mask.detach().cpu().numpy() > 0).save(args.output)
+    attn_mask = do_kmeans(mask_attentions.float(), sam_pred_masks.detach().cpu() > 0.0)
+    draw_mask(image, sam_pred_masks.detach().cpu().numpy() > 0).save(args.output)
     draw_mask(image, attn_mask.numpy()).save(args.output.replace('.jpg', '_attn.jpg'))
+    draw_mask(image, cnn_pred_masks.detach().cpu().numpy() > 0).save(args.output.replace('.jpg', '_cnn.jpg'))
