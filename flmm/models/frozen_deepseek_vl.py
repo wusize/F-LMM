@@ -170,7 +170,7 @@ class FrozenDeepseekVLSAM(FrozenDeepseekVL):
         mask_attentions = mask_attentions.view(num_layers, num_heads,
                                                *mask_attentions.shape[-2:])
 
-        return mask_attentions[-1], pred_masks[0], sam_pred_masks[0]
+        return mask_attentions.sum(0), pred_masks[0], sam_pred_masks[0]
 
     def get_text_layer_weights(self):
         return torch.softmax(self.text_layer_weights, dim=0)
