@@ -45,7 +45,7 @@ def draw_mask(image, mask):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(formatter_class=argparse.RawTextHelpFormatter)
     parser.add_argument('config', help='config file path.')
-    parser.add_argument('--image', default='images/dog-and-cat-cover.jpg', type=str)
+    parser.add_argument('--image', default='images/example.jpg', type=str)
     parser.add_argument('--checkpoint',
                         default='checkpoints/frozen_llava_1_5_vicuna_7b_unet_sam_l_refcoco_png.pth', type=str)
     parser.add_argument('--text', default='The cat next to the dog.', type=str)
