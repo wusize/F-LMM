@@ -160,13 +160,11 @@ python scripts/visual_cot/gpt_eval_cot_score.py --result_dir the/directory/of/al
 ## Citation
 
 ```bibtex
-@misc{wu2024flmm,
-      title={F-LMM: Grounding Frozen Large Multimodal Models}, 
-      author={Size Wu and Sheng Jin and Wenwei Zhang and Lumin Xu and Wentao Liu and Wei Li and Chen Change Loy},
-      year={2024},
-      eprint={2406.05821},
-      archivePrefix={arXiv},
-      primaryClass={cs.CV}
+@article{wu2024flmm,
+  title={F-lmm: Grounding frozen large multimodal models},
+  author={Wu, Size and Jin, Sheng and Zhang, Wenwei and Xu, Lumin and Liu, Wentao and Li, Wei and Loy, Chen Change},
+  journal={arXiv preprint arXiv:2406.05821},
+  year={2024}
 }
 ```
 
